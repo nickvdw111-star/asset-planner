@@ -585,6 +585,7 @@ async function loadClients() {
     sel.appendChild(opt);
   });
   if (prev && allClients.find(c => c.id == prev)) sel.value = prev;
+  return allClients;
 }
 
 document.getElementById('client-select').addEventListener('change', async e => {
@@ -704,7 +705,7 @@ function renderTree() {
     }));
 
     const buildingsEl = document.createElement('div');
-    buildingsEl.className = 'tree-children open';
+    buildingsEl.className = 'tree-children';
 
     city.buildings.forEach(building => {
       const bldBlock = document.createElement('div');
@@ -751,7 +752,7 @@ function renderTree() {
       }));
 
       const floorsEl = document.createElement('div');
-      floorsEl.className = 'tree-children open';
+      floorsEl.className = 'tree-children';
       building.floors.forEach(floor => floorsEl.appendChild(makeFloorRow(floor)));
 
       bldBlock.appendChild(floorsEl);
@@ -838,7 +839,7 @@ function makeRow(level, icon, name, count, { nameHtml, addLabel, addAction, addU
   row.className = `tree-row level-${level}`;
 
   const toggle = document.createElement('span');
-  toggle.className = 'tree-toggle open';
+  toggle.className = 'tree-toggle';
   toggle.textContent = '▶';
 
   const iconEl = document.createElement('span');
@@ -959,7 +960,7 @@ function makeFloorRow(floor) {
   openBtn.className = 'btn btn-primary btn-sm';
   openBtn.textContent = 'Open →';
   openBtn.disabled = !floor.has_floorplan;
-  openBtn.onclick = e => { e.stopPropagation(); window.location.href = `/planner?floor=${floor.id}`; };
+  openBtn.onclick = e => { e.stopPropagation(); window.location.href = `/planner?floor=${floor.id}&client=${activeClient?.id || ''}`; };
 
   const delBtn = document.createElement('button');
   delBtn.className = 'btn btn-danger btn-sm';
@@ -1283,7 +1284,10 @@ document.getElementById('dm-new-model').addEventListener('keydown', e => {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 
-loadClients();
+loadClients().then(() => {
+  const returnClient = parseInt(new URLSearchParams(location.search).get('client'));
+  if (returnClient) selectClientById(returnClient);
+});
 loadDeviceCatalogue();
 </script>
 </body>

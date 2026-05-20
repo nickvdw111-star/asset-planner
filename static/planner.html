@@ -217,7 +217,7 @@
 <div id="file-drop-overlay">Drop new floor plan here to replace</div>
 
 <header>
-  <a href="/" class="btn btn-neutral btn-sm" style="text-decoration:none">← Dashboard</a>
+  <a id="back-btn" href="/" class="btn btn-neutral btn-sm" style="text-decoration:none">← Dashboard</a>
   <h1>🖨 Floor Planner</h1>
   <span id="floor-label">Loading…</span>
 
@@ -396,8 +396,11 @@ const DEVICE_ICONS = { printer:'🖨', mfp:'🗄', scanner:'📠', server:'🖥'
 const DEVICE_NAMES = { printer:'Printer', mfp:'MFP', scanner:'Scanner', server:'Print Server' };
 
 // ── Floor context ─────────────────────────────────────────────────────────────
-const floorId = new URLSearchParams(location.search).get('floor');
+const _params = new URLSearchParams(location.search);
+const floorId  = _params.get('floor');
+const clientId = _params.get('client');
 if (!floorId) { alert('No floor specified.'); location.href = '/'; }
+if (clientId) document.getElementById('back-btn').href = `/?client=${clientId}`;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let devices      = [];

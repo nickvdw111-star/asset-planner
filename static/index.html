@@ -466,8 +466,9 @@ document.getElementById('nc-name').addEventListener('keydown', e => {
   if (e.key === 'Enter') closeNcModal(true);
   if (e.key === 'Escape') closeNcModal(false);
 });
-function openNcModal() {
-  document.getElementById('nc-name').value = '';
+function openNcModal(title = '🏢 New Client', initialName = '') {
+  document.getElementById('new-client-modal').querySelector('h2').textContent = title;
+  document.getElementById('nc-name').value = initialName;
   document.getElementById('new-client-modal').classList.add('open');
   setTimeout(() => document.getElementById('nc-name').focus(), 50);
   return new Promise(r => { ncResolve = r; });
@@ -509,10 +510,13 @@ document.getElementById('bld-locate').onclick = () => {
     toast('Location captured');
   }, () => toast('Could not get location'));
 };
-function openBldModal() {
-  document.getElementById('bld-name').value = '';
-  document.getElementById('bld-lat').value  = '';
-  document.getElementById('bld-lng').value  = '';
+function openBldModal(existing = null) {
+  const isEdit = existing != null;
+  document.getElementById('building-modal').querySelector('h2').textContent = isEdit ? '✏️ Edit Building' : '🏗 Add Building';
+  document.getElementById('bld-save').textContent = isEdit ? 'Save Changes' : 'Add Building';
+  document.getElementById('bld-name').value = existing?.name || '';
+  document.getElementById('bld-lat').value  = existing?.lat  != null ? existing.lat  : '';
+  document.getElementById('bld-lng').value  = existing?.lng  != null ? existing.lng  : '';
   document.getElementById('building-modal').classList.add('open');
   setTimeout(() => document.getElementById('bld-name').focus(), 50);
   return new Promise(r => { bldResolve = r; });
@@ -642,6 +646,13 @@ function renderTree() {
         toast('Building added');
         await loadClientData(activeClient.id);
       },
+      editAction: async () => {
+        const newName = await openNcModal('✏️ Edit City', city.name);
+        if (!newName || newName === city.name) return;
+        await api('PUT', `/cities/${city.id}`, { name: newName });
+        toast('City updated');
+        await loadClientData(activeClient.id);
+      },
       deleteAction: async () => {
         if (!await confirm(`city "${city.name}" and all its data`)) return;
         await api('DELETE', `/cities/${city.id}`);
@@ -681,6 +692,13 @@ function renderTree() {
             toast(`${floorLabel(nextDown)} added`);
             await loadClientData(activeClient.id);
           } catch (err) { toast(err.message); }
+        },
+        editAction: async () => {
+          const result = await openBldModal(building);
+          if (!result || !result.name) return;
+          await api('PUT', `/buildings/${building.id}`, result);
+          toast('Building updated');
+          await loadClientData(activeClient.id);
         },
         deleteAction: async () => {
           if (!await confirm(`building "${building.name}" and all its data`)) return;
@@ -773,7 +791,7 @@ function floorLabel(level) {
 
 // ── Row / form builders ───────────────────────────────────────────────────────
 
-function makeRow(level, icon, name, count, { nameHtml, addLabel, addAction, addUpLabel, addUpAction, addDownLabel, addDownAction, deleteAction }) {
+function makeRow(level, icon, name, count, { nameHtml, addLabel, addAction, addUpLabel, addUpAction, addDownLabel, addDownAction, editAction, deleteAction }) {
   const row = document.createElement('div');
   row.className = `tree-row level-${level}`;
 
@@ -817,6 +835,15 @@ function makeRow(level, icon, name, count, { nameHtml, addLabel, addAction, addU
     addBtn.textContent = addLabel;
     addBtn.onclick = e => { e.stopPropagation(); addAction(); };
     actions.appendChild(addBtn);
+  }
+
+  if (editAction) {
+    const editBtn = document.createElement('button');
+    editBtn.className = 'btn btn-ghost btn-sm';
+    editBtn.textContent = '✏️';
+    editBtn.title = 'Edit';
+    editBtn.onclick = e => { e.stopPropagation(); editAction(); };
+    actions.appendChild(editBtn);
   }
 
   const delBtn = document.createElement('button');

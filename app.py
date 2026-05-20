@@ -396,6 +396,17 @@ def create_city(cid):
         row = db.execute('SELECT * FROM cities WHERE id = ?', (cur.lastrowid,)).fetchone()
     return jsonify(dict(row)), 201
 
+@app.route('/api/cities/<int:city_id>', methods=['PUT'])
+def update_city(city_id):
+    data = request.json or {}
+    name = data.get('name', '').strip()
+    if not name:
+        return jsonify({'error': 'name required'}), 400
+    with get_db() as db:
+        db.execute('UPDATE cities SET name=? WHERE id=?', (name, city_id))
+        row = db.execute('SELECT * FROM cities WHERE id=?', (city_id,)).fetchone()
+    return jsonify(dict(row))
+
 @app.route('/api/cities/<int:city_id>', methods=['DELETE'])
 def delete_city(city_id):
     with get_db() as db:
@@ -426,6 +437,21 @@ def create_building(city_id):
         cur = db.execute('INSERT INTO buildings (city_id, name, lat, lng) VALUES (?, ?, ?, ?)', (city_id, name, lat, lng))
         row = db.execute('SELECT * FROM buildings WHERE id = ?', (cur.lastrowid,)).fetchone()
     return jsonify(dict(row)), 201
+
+@app.route('/api/buildings/<int:building_id>', methods=['PUT'])
+def update_building(building_id):
+    data = request.json or {}
+    name = data.get('name', '').strip()
+    if not name:
+        return jsonify({'error': 'name required'}), 400
+    lat = data.get('lat')
+    lng = data.get('lng')
+    lat = float(lat) if lat not in (None, '') else None
+    lng = float(lng) if lng not in (None, '') else None
+    with get_db() as db:
+        db.execute('UPDATE buildings SET name=?, lat=?, lng=? WHERE id=?', (name, lat, lng, building_id))
+        row = db.execute('SELECT * FROM buildings WHERE id=?', (building_id,)).fetchone()
+    return jsonify(dict(row))
 
 @app.route('/api/buildings/<int:building_id>', methods=['DELETE'])
 def delete_building(building_id):

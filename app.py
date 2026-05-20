@@ -81,6 +81,14 @@ def init_db():
             db.execute('ALTER TABLE devices ADD COLUMN avg_mono INTEGER NOT NULL DEFAULT 0')
         if 'avg_colour' not in cols:
             db.execute('ALTER TABLE devices ADD COLUMN avg_colour INTEGER NOT NULL DEFAULT 0')
+        if 'mono_rate' not in cols:
+            db.execute('ALTER TABLE devices ADD COLUMN mono_rate REAL')
+        if 'colour_rate' not in cols:
+            db.execute('ALTER TABLE devices ADD COLUMN colour_rate REAL')
+        if 'rental_amount' not in cols:
+            db.execute('ALTER TABLE devices ADD COLUMN rental_amount REAL')
+        if 'rental_period' not in cols:
+            db.execute("ALTER TABLE devices ADD COLUMN rental_period TEXT")
         bcols = [r[1] for r in db.execute('PRAGMA table_info(buildings)').fetchall()]
         if 'lat' not in bcols:
             db.execute('ALTER TABLE buildings ADD COLUMN lat REAL')
@@ -376,6 +384,16 @@ def create_client():
         row = db.execute('SELECT * FROM clients WHERE id = ?', (cur.lastrowid,)).fetchone()
     return jsonify(dict(row)), 201
 
+@app.route('/api/clients/<int:cid>', methods=['PUT'])
+def update_client(cid):
+    name = (request.json or {}).get('name', '').strip()
+    if not name:
+        return jsonify({'error': 'name required'}), 400
+    with get_db() as db:
+        db.execute('UPDATE clients SET name=? WHERE id=?', (name, cid))
+        row = db.execute('SELECT * FROM clients WHERE id=?', (cid,)).fetchone()
+    return jsonify(dict(row))
+
 @app.route('/api/clients/<int:cid>', methods=['DELETE'])
 def delete_client(cid):
     with get_db() as db:
@@ -574,13 +592,16 @@ def update_device(device_id):
     with get_db() as db:
         db.execute('''
             UPDATE devices
-            SET type=?, label=?, brand=?, model=?, serial=?, notes=?, avg_mono=?, avg_colour=?, x_pct=?, y_pct=?
+            SET type=?, label=?, brand=?, model=?, serial=?, notes=?, avg_mono=?, avg_colour=?,
+                mono_rate=?, colour_rate=?, rental_amount=?, rental_period=?, x_pct=?, y_pct=?
             WHERE id=?
         ''', (
             d.get('type'), d.get('label'),
             d.get('brand', ''), d.get('model', ''),
             d.get('serial', ''), d.get('notes', ''),
             d.get('avg_mono', 0), d.get('avg_colour', 0),
+            d.get('mono_rate') or None, d.get('colour_rate') or None,
+            d.get('rental_amount') or None, d.get('rental_period') or None,
             d.get('x_pct'), d.get('y_pct'),
             device_id,
         ))

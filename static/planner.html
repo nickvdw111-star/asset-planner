@@ -348,6 +348,33 @@
         <input id="modal-avg-colour" class="input" type="number" min="0" placeholder="e.g. 500">
       </div>
     </div>
+    <div class="modal-field" style="display:flex;gap:10px">
+      <div style="flex:1">
+        <label>Mono Rate (R/page)</label>
+        <input id="modal-mono-rate" class="input" type="number" min="0" step="0.001" placeholder="e.g. 0.08">
+      </div>
+      <div style="flex:1">
+        <label>Colour Rate (R/page)</label>
+        <input id="modal-colour-rate" class="input" type="number" min="0" step="0.001" placeholder="e.g. 0.45">
+      </div>
+    </div>
+    <div class="modal-field" style="display:flex;gap:10px;align-items:flex-end">
+      <div style="flex:1">
+        <label>Rental Amount (R/month)</label>
+        <input id="modal-rental-amount" class="input" type="number" min="0" step="0.01" placeholder="e.g. 850.00">
+      </div>
+      <div style="flex:1">
+        <label>Rental Period</label>
+        <select id="modal-rental-period" class="input">
+          <option value="">No rental</option>
+          <option value="12">12 months</option>
+          <option value="24">24 months</option>
+          <option value="36">36 months</option>
+          <option value="72">72 months</option>
+          <option value="Evergreen">Evergreen</option>
+        </select>
+      </div>
+    </div>
     <div class="modal-field">
       <label>Notes</label>
       <textarea id="modal-notes" class="input" placeholder="e.g. Shared with finance team, needs toner end of month"></textarea>
@@ -880,10 +907,14 @@ newModelInput.addEventListener('keydown', e => {
 function openEditModal(data, el) {
   modalTarget          = { data, el };
   modalLabel.value     = data.label;
-  modalSerial.value    = data.serial    || '';
-  modalAvgMono.value   = data.avg_mono  || '';
-  modalAvgColour.value = data.avg_colour || '';
-  modalNotes.value     = data.notes     || '';
+  modalSerial.value    = data.serial       || '';
+  modalAvgMono.value   = data.avg_mono     || '';
+  modalAvgColour.value = data.avg_colour   || '';
+  document.getElementById('modal-mono-rate').value     = data.mono_rate     || '';
+  document.getElementById('modal-colour-rate').value   = data.colour_rate   || '';
+  document.getElementById('modal-rental-amount').value = data.rental_amount || '';
+  document.getElementById('modal-rental-period').value = data.rental_period || '';
+  modalNotes.value     = data.notes        || '';
   populateBrandSelect(data.brand || '');
   populateModelSelect(data.brand || '', data.model || '');
   editBackdrop.classList.add('open');
@@ -905,13 +936,17 @@ editBackdrop.addEventListener('click', e => { if (e.target === editBackdrop) clo
 document.getElementById('modal-save').addEventListener('click', async () => {
   if (!modalTarget) return;
   const { data, el } = modalTarget;
-  data.label      = modalLabel.value.trim()  || data.label;
-  data.brand      = modalBrand.value;
-  data.model      = modalModel.value;
-  data.serial     = modalSerial.value.trim();
-  data.avg_mono   = parseInt(modalAvgMono.value)   || 0;
-  data.avg_colour = parseInt(modalAvgColour.value) || 0;
-  data.notes      = modalNotes.value.trim();
+  data.label         = modalLabel.value.trim()  || data.label;
+  data.brand         = modalBrand.value;
+  data.model         = modalModel.value;
+  data.serial        = modalSerial.value.trim();
+  data.avg_mono      = parseInt(modalAvgMono.value)   || 0;
+  data.avg_colour    = parseInt(modalAvgColour.value) || 0;
+  data.mono_rate     = parseFloat(document.getElementById('modal-mono-rate').value)     || null;
+  data.colour_rate   = parseFloat(document.getElementById('modal-colour-rate').value)   || null;
+  data.rental_amount = parseFloat(document.getElementById('modal-rental-amount').value) || null;
+  data.rental_period = document.getElementById('modal-rental-period').value || null;
+  data.notes         = modalNotes.value.trim();
   el.querySelector('.d-label').textContent = data.label;
   refreshVolLabel(el, data);
   closeEditModal();
@@ -938,11 +973,13 @@ function deleteDevice(data, el) {
 
 function syncDevice(data) {
   return apiJson('PUT', `/devices/${data.id}`, {
-    type:       data.type,       label:      data.label,
-    brand:      data.brand,      model:      data.model,
-    serial:     data.serial,     notes:      data.notes,
-    avg_mono:   data.avg_mono,   avg_colour: data.avg_colour,
-    x_pct:      data.x_pct,      y_pct:      data.y_pct,
+    type:           data.type,           label:          data.label,
+    brand:          data.brand,          model:          data.model,
+    serial:         data.serial,         notes:          data.notes,
+    avg_mono:       data.avg_mono,       avg_colour:     data.avg_colour,
+    mono_rate:      data.mono_rate,      colour_rate:    data.colour_rate,
+    rental_amount:  data.rental_amount,  rental_period:  data.rental_period,
+    x_pct:          data.x_pct,         y_pct:          data.y_pct,
   });
 }
 

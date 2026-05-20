@@ -245,6 +245,7 @@
       <select id="client-select">
         <option value="">— Select a client —</option>
       </select>
+      <button class="btn btn-ghost btn-sm" id="edit-client-btn" title="Rename client" style="display:none">✏️</button>
       <button class="btn btn-primary btn-sm" id="new-client-btn">+ New Client</button>
     </div>
 
@@ -381,6 +382,33 @@
         <input type="number" class="input" id="dm-colour" min="0" placeholder="e.g. 500">
       </div>
     </div>
+    <div class="modal-field" style="display:flex; gap:10px">
+      <div style="flex:1">
+        <label>Mono Rate (R/page)</label>
+        <input type="number" class="input" id="dm-mono-rate" min="0" step="0.001" placeholder="e.g. 0.08">
+      </div>
+      <div style="flex:1">
+        <label>Colour Rate (R/page)</label>
+        <input type="number" class="input" id="dm-colour-rate" min="0" step="0.001" placeholder="e.g. 0.45">
+      </div>
+    </div>
+    <div class="modal-field" style="display:flex; gap:10px; align-items:flex-end">
+      <div style="flex:1">
+        <label>Rental Amount (R/month)</label>
+        <input type="number" class="input" id="dm-rental-amount" min="0" step="0.01" placeholder="e.g. 850.00">
+      </div>
+      <div style="flex:1">
+        <label>Rental Period</label>
+        <select class="input" id="dm-rental-period">
+          <option value="">No rental</option>
+          <option value="12">12 months</option>
+          <option value="24">24 months</option>
+          <option value="36">36 months</option>
+          <option value="72">72 months</option>
+          <option value="Evergreen">Evergreen</option>
+        </select>
+      </div>
+    </div>
     <div class="modal-field">
       <label>Notes</label>
       <textarea class="input" id="dm-notes" placeholder="e.g. Shared with finance"></textarea>
@@ -490,6 +518,18 @@ document.getElementById('new-client-btn').onclick = async () => {
   } catch (err) { toast('Error: ' + err.message); }
 };
 
+document.getElementById('edit-client-btn').onclick = async () => {
+  if (!activeClient) return;
+  const newName = await openNcModal('✏️ Rename Client', activeClient.name);
+  if (!newName || newName === activeClient.name) return;
+  try {
+    await api('PUT', `/clients/${activeClient.id}`, { name: newName });
+    toast(`Client renamed to "${newName}"`);
+    await loadClients();
+    selectClientById(activeClient.id);
+  } catch (err) { toast('Error: ' + err.message); }
+};
+
 // ── Building modal ────────────────────────────────────────────────────────────
 
 let bldResolve = null;
@@ -559,6 +599,7 @@ function clearClient() {
   document.getElementById('tree-scroll').style.display = 'none';
   document.getElementById('no-client-hint').classList.remove('hidden');
   document.getElementById('tree-root').innerHTML = '';
+  document.getElementById('edit-client-btn').style.display = 'none';
   renderMap();
 }
 
@@ -583,6 +624,7 @@ function renderClientPanel() {
   document.getElementById('no-client-hint').classList.add('hidden');
   document.getElementById('client-actions').classList.remove('hidden');
   document.getElementById('tree-scroll').style.display = 'block';
+  document.getElementById('edit-client-btn').style.display = 'inline-flex';
 
   // Stats
   let totalBuildings = 0, totalDevices = 0;
@@ -1106,11 +1148,15 @@ function openDeviceModal(device, floorId, container) {
   dmTarget = { device, floorId, container };
   const icons = DEVICE_ICONS_MAP;
   document.getElementById('dm-title').textContent = `${icons[device.type] || '🖨'} ${device.label || 'Device'}`;
-  document.getElementById('dm-label').value  = device.label  || '';
-  document.getElementById('dm-serial').value = device.serial || '';
-  document.getElementById('dm-mono').value   = device.avg_mono   || '';
-  document.getElementById('dm-colour').value = device.avg_colour || '';
-  document.getElementById('dm-notes').value  = device.notes  || '';
+  document.getElementById('dm-label').value         = device.label       || '';
+  document.getElementById('dm-serial').value        = device.serial      || '';
+  document.getElementById('dm-mono').value          = device.avg_mono    || '';
+  document.getElementById('dm-colour').value        = device.avg_colour  || '';
+  document.getElementById('dm-mono-rate').value     = device.mono_rate   || '';
+  document.getElementById('dm-colour-rate').value   = device.colour_rate || '';
+  document.getElementById('dm-rental-amount').value = device.rental_amount || '';
+  document.getElementById('dm-rental-period').value = device.rental_period || '';
+  document.getElementById('dm-notes').value         = device.notes       || '';
   document.getElementById('dm-brand-add-row').classList.remove('open');
   document.getElementById('dm-model-add-row').classList.remove('open');
   document.getElementById('dm-new-brand').value = '';
@@ -1135,16 +1181,20 @@ document.getElementById('dm-save').addEventListener('click', async () => {
   if (!dmTarget) return;
   const { device, floorId, container } = dmTarget;
   const updated = {
-    type:       device.type,
-    label:      document.getElementById('dm-label').value.trim()  || device.label,
-    brand:      document.getElementById('dm-brand').value,
-    model:      document.getElementById('dm-model').value,
-    serial:     document.getElementById('dm-serial').value.trim(),
-    avg_mono:   parseInt(document.getElementById('dm-mono').value)   || 0,
-    avg_colour: parseInt(document.getElementById('dm-colour').value) || 0,
-    notes:      document.getElementById('dm-notes').value.trim(),
-    x_pct:      device.x_pct,
-    y_pct:      device.y_pct,
+    type:           device.type,
+    label:          document.getElementById('dm-label').value.trim()  || device.label,
+    brand:          document.getElementById('dm-brand').value,
+    model:          document.getElementById('dm-model').value,
+    serial:         document.getElementById('dm-serial').value.trim(),
+    avg_mono:       parseInt(document.getElementById('dm-mono').value)         || 0,
+    avg_colour:     parseInt(document.getElementById('dm-colour').value)       || 0,
+    mono_rate:      parseFloat(document.getElementById('dm-mono-rate').value)  || null,
+    colour_rate:    parseFloat(document.getElementById('dm-colour-rate').value)|| null,
+    rental_amount:  parseFloat(document.getElementById('dm-rental-amount').value) || null,
+    rental_period:  document.getElementById('dm-rental-period').value || null,
+    notes:          document.getElementById('dm-notes').value.trim(),
+    x_pct:          device.x_pct,
+    y_pct:          device.y_pct,
   };
   try {
     await api('PUT', `/devices/${device.id}`, updated);

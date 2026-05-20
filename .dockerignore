@@ -1,0 +1,6 @@
+printer_planner.db
+uploads/
+*.log
+__pycache__/
+*.pyc
+data/

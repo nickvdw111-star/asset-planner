@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Device Catalogue — Printer Planner</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    header {
+      padding: 12px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 17px; font-weight: 600; }
+
+    .body { display: flex; flex: 1; overflow: hidden; gap: 0; }
+
+    /* ── Left: catalogue list ── */
+    #catalogue-panel {
+      width: 480px;
+      min-width: 320px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #catalogue-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    #catalogue-scroll { flex: 1; overflow-y: auto; padding: 8px 0; }
+
+    .brand-block { border-bottom: 1px solid var(--border); }
+
+    .brand-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 16px;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.1s;
+    }
+    .brand-row:hover { background: var(--surface2); }
+    .brand-toggle { font-size: 10px; color: var(--muted); width: 14px; text-align: center; flex-shrink: 0; transition: transform 0.15s; }
+    .brand-toggle.open { transform: rotate(90deg); }
+    .brand-name { flex: 1; font-size: 13px; font-weight: 600; }
+    .brand-actions { display: flex; gap: 4px; opacity: 0; transition: opacity 0.15s; }
+    .brand-row:hover .brand-actions { opacity: 1; }
+
+    .model-list { display: none; padding: 0 0 6px 0; }
+    .model-list.open { display: block; }
+
+    .model-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px 6px 42px;
+      transition: background 0.1s;
+    }
+    .model-row:hover { background: var(--surface2); }
+    .model-name { flex: 1; font-size: 13px; color: var(--muted); }
+    .model-del { opacity: 0; transition: opacity 0.15s; }
+    .model-row:hover .model-del { opacity: 1; }
+
+    .add-model-form {
+      display: none;
+      padding: 6px 16px 8px 42px;
+      gap: 6px;
+    }
+    .add-model-form.open { display: flex; align-items: center; }
+    .add-model-form .input { flex: 1; font-size: 12px; padding: 5px 8px; }
+
+    /* ── Right: add brand ── */
+    #right-panel {
+      flex: 1;
+      padding: 28px 32px;
+      overflow-y: auto;
+    }
+    #right-panel h2 { font-size: 14px; color: var(--muted); margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.07em; }
+
+    .add-brand-card {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 10px;
+      padding: 20px;
+      max-width: 380px;
+      margin-bottom: 24px;
+    }
+    .add-brand-card label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 6px; }
+    .add-brand-row { display: flex; gap: 8px; }
+
+    .empty-catalogue {
+      padding: 48px 16px;
+      text-align: center;
+      color: var(--muted2);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+    .empty-catalogue .big { font-size: 48px; opacity: 0.3; display: block; margin-bottom: 12px; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-size: 13px;
+      color: var(--text);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      transition: transform 0.25s ease;
+      z-index: 9999;
+      white-space: nowrap;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="/" class="btn btn-neutral btn-sm" style="text-decoration:none">← Dashboard</a>
+  <h1>🗂 Device Catalogue</h1>
+  <span style="font-size:12px; color:var(--muted)">Manage brands and models available in the planner</span>
+</header>
+
+<div class="body">
+
+  <!-- Left: catalogue -->
+  <div id="catalogue-panel">
+    <div id="catalogue-header">
+      <span class="section-label">Brands &amp; Models</span>
+      <span id="catalogue-count" style="font-size:11px; color:var(--muted)"></span>
+    </div>
+    <div id="catalogue-scroll">
+      <div id="catalogue-root"></div>
+    </div>
+  </div>
+
+  <!-- Right: add brand -->
+  <div id="right-panel">
+    <h2>Add Brand</h2>
+    <div class="add-brand-card">
+      <label>Brand Name</label>
+      <div class="add-brand-row">
+        <input id="new-brand-input" class="input" type="text" placeholder="e.g. HP, Ricoh, Canon, Kyocera">
+        <button class="btn btn-primary" id="add-brand-btn">Add Brand</button>
+      </div>
+    </div>
+
+    <h2>Tips</h2>
+    <div style="font-size:13px; color:var(--muted); line-height:1.8; max-width:360px;">
+      Add a brand first, then expand it and use <b>+ Add Model</b> to register models under it.<br><br>
+      These brands and models will appear as dropdowns when editing a device in the floor planner.
+    </div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+let catalogue = [];
+
+async function api(method, path, body) {
+  const opts = { method, headers: {} };
+  if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  const res = await fetch('/api' + path, opts);
+  if (!res.ok) throw new Error(await res.text());
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+async function load() {
+  catalogue = await api('GET', '/brands');
+  render();
+}
+
+function render() {
+  const root  = document.getElementById('catalogue-root');
+  const count = document.getElementById('catalogue-count');
+  root.innerHTML = '';
+
+  if (!catalogue.length) {
+    root.innerHTML = '<div class="empty-catalogue"><span class="big">🗂</span>No brands yet.<br>Add one using the form on the right.</div>';
+    count.textContent = '';
+    return;
+  }
+
+  count.textContent = `${catalogue.length} brand${catalogue.length !== 1 ? 's' : ''}`;
+
+  catalogue.forEach(brand => {
+    const block = document.createElement('div');
+    block.className = 'brand-block';
+
+    // Brand row
+    const row = document.createElement('div');
+    row.className = 'brand-row';
+
+    const toggle = document.createElement('span');
+    toggle.className = 'brand-toggle open';
+    toggle.textContent = '▶';
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'brand-name';
+    nameEl.textContent = brand.name;
+
+    const badge = document.createElement('span');
+    badge.className = 'badge' + (brand.models.length === 0 ? ' zero' : '');
+    badge.textContent = brand.models.length;
+    badge.title = `${brand.models.length} model${brand.models.length !== 1 ? 's' : ''}`;
+
+    const actions = document.createElement('div');
+    actions.className = 'brand-actions';
+
+    const addModelBtn = document.createElement('button');
+    addModelBtn.className = 'btn btn-ghost btn-sm';
+    addModelBtn.textContent = '+ Add Model';
+    addModelBtn.onclick = e => {
+      e.stopPropagation();
+      modelList.classList.add('open');
+      toggle.classList.add('open');
+      addModelForm.classList.toggle('open');
+      if (addModelForm.classList.contains('open')) addModelForm.querySelector('input').focus();
+    };
+
+    const delBrandBtn = document.createElement('button');
+    delBrandBtn.className = 'btn btn-danger btn-sm';
+    delBrandBtn.textContent = '✕';
+    delBrandBtn.title = 'Delete brand and all its models';
+    delBrandBtn.onclick = async e => {
+      e.stopPropagation();
+      if (!confirm(`Delete brand "${brand.name}" and all its models?`)) return;
+      await api('DELETE', `/brands/${brand.id}`);
+      toast(`Brand "${brand.name}" deleted`);
+      load();
+    };
+
+    actions.appendChild(addModelBtn);
+    actions.appendChild(delBrandBtn);
+    row.appendChild(toggle);
+    row.appendChild(nameEl);
+    row.appendChild(badge);
+    row.appendChild(actions);
+
+    // Toggle collapse
+    row.addEventListener('click', () => {
+      const isOpen = modelList.classList.toggle('open');
+      toggle.classList.toggle('open', isOpen);
+    });
+
+    // Model list
+    const modelList = document.createElement('div');
+    modelList.className = 'model-list open';
+
+    brand.models.forEach(model => {
+      const mRow = document.createElement('div');
+      mRow.className = 'model-row';
+
+      const mName = document.createElement('span');
+      mName.className = 'model-name';
+      mName.textContent = model.name;
+
+      const mDel = document.createElement('button');
+      mDel.className = 'btn btn-danger btn-sm model-del';
+      mDel.textContent = '✕';
+      mDel.title = 'Delete model';
+      mDel.onclick = async e => {
+        e.stopPropagation();
+        if (!confirm(`Delete model "${model.name}"?`)) return;
+        await api('DELETE', `/models/${model.id}`);
+        toast(`Model "${model.name}" deleted`);
+        load();
+      };
+
+      mRow.appendChild(mName);
+      mRow.appendChild(mDel);
+      modelList.appendChild(mRow);
+    });
+
+    // Add model form
+    const addModelForm = document.createElement('div');
+    addModelForm.className = 'add-model-form';
+
+    const mInput = document.createElement('input');
+    mInput.type = 'text';
+    mInput.className = 'input';
+    mInput.placeholder = 'Model name, e.g. LaserJet Pro M404n';
+
+    const mAddBtn = document.createElement('button');
+    mAddBtn.className = 'btn btn-primary btn-sm';
+    mAddBtn.textContent = 'Add';
+
+    const mCancelBtn = document.createElement('button');
+    mCancelBtn.className = 'btn btn-neutral btn-sm';
+    mCancelBtn.textContent = 'Cancel';
+
+    const submitModel = async () => {
+      const val = mInput.value.trim();
+      if (!val) return;
+      await api('POST', `/brands/${brand.id}/models`, { name: val });
+      toast(`Model "${val}" added`);
+      mInput.value = '';
+      addModelForm.classList.remove('open');
+      load();
+    };
+
+    mInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') submitModel();
+      if (e.key === 'Escape') { mInput.value = ''; addModelForm.classList.remove('open'); }
+    });
+    mAddBtn.onclick = submitModel;
+    mCancelBtn.onclick = () => { mInput.value = ''; addModelForm.classList.remove('open'); };
+
+    addModelForm.appendChild(mInput);
+    addModelForm.appendChild(mAddBtn);
+    addModelForm.appendChild(mCancelBtn);
+
+    block.appendChild(row);
+    block.appendChild(modelList);
+    block.appendChild(addModelForm);
+    root.appendChild(block);
+  });
+}
+
+// ── Add brand ─────────────────────────────────────────────────────────────────
+
+const newBrandInput = document.getElementById('new-brand-input');
+const addBrandBtn   = document.getElementById('add-brand-btn');
+
+const submitBrand = async () => {
+  const val = newBrandInput.value.trim();
+  if (!val) return;
+  try {
+    await api('POST', '/brands', { name: val });
+    toast(`Brand "${val}" added`);
+    newBrandInput.value = '';
+    load();
+  } catch (err) {
+    toast('Error: ' + err.message);
+  }
+};
+
+addBrandBtn.onclick = submitBrand;
+newBrandInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitBrand(); });
+
+load();
+</script>
+</body>
+</html>

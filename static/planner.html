@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Floor Planner</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    body { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* ── Header ── */
+    header {
+      padding: 9px 16px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 15px; font-weight: 600; }
+    #floor-label { font-size: 12px; color: var(--muted); }
+
+    /* ── Sync indicator ── */
+    #sync-status {
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    #sync-status.saving { color: #facc15; }
+    #sync-status.saved  { color: #4ade80; }
+    #sync-status.error  { color: var(--danger-t); }
+
+    /* ── Zoom bar ── */
+    #zoom-bar { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+    #zoom-bar input { width: 72px; accent-color: var(--accent); }
+
+    /* ── Workspace ── */
+    .workspace { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── Sidebar ── */
+    aside {
+      width: 172px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 12px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+
+    .device-tile {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 8px;
+      text-align: center;
+      cursor: grab;
+      user-select: none;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .device-tile:hover  { background: #2e3245; border-color: var(--accent-h); }
+    .device-tile:active { cursor: grabbing; }
+    .device-tile .tile-icon { font-size: 28px; display: block; line-height: 1; }
+    .device-tile .tile-name { font-size: 10px; color: var(--muted); margin-top: 5px; }
+
+    .help-text { font-size: 11px; color: var(--muted2); line-height: 1.65; }
+    .help-text b { color: var(--muted); }
+
+    #stats-panel { margin-top: auto; font-size: 11px; color: var(--muted2); line-height: 1.7; }
+    #stats-panel b { color: var(--muted); }
+
+    /* ── Canvas area ── */
+    #canvas-area {
+      flex: 1;
+      overflow: auto;
+      background: #0d0f14;
+      position: relative;
+    }
+
+    #plan-container {
+      position: relative;
+      display: inline-block;
+      margin: 20px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    }
+
+    #floor-canvas { display: block; }
+
+    /* ── Empty state ── */
+    #empty-state {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--border2);
+      pointer-events: none;
+      gap: 14px;
+    }
+    #empty-state .big { font-size: 64px; opacity: 0.3; }
+    #empty-state p { font-size: 13px; text-align: center; line-height: 1.7; }
+
+    /* ── Device nodes ── */
+    .device-node {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: move;
+      user-select: none;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+      padding: 4px;
+    }
+    .device-node .d-icon {
+      font-size: 22px;
+      line-height: 1;
+      transition: filter 0.15s;
+      background: rgba(15, 23, 42, 0.82);
+      border: 1.5px solid rgba(96, 165, 250, 0.6);
+      border-radius: 8px;
+      padding: 5px 6px;
+    }
+    .device-node .d-label {
+      background: rgba(30, 58, 138, 0.88);
+      border: 1px solid var(--accent-h);
+      border-radius: 4px 4px 0 0;
+      padding: 2px 7px;
+      font-size: 10px;
+      white-space: nowrap;
+      margin-top: 3px;
+      color: #dbeafe;
+      pointer-events: none;
+    }
+    .device-node .d-vol {
+      background: rgba(15, 30, 80, 0.88);
+      border: 1px solid var(--accent-h);
+      border-top: none;
+      border-radius: 0 0 4px 4px;
+      padding: 1px 7px;
+      font-size: 9px;
+      white-space: nowrap;
+      color: #93c5fd;
+      pointer-events: none;
+      display: none;
+    }
+    .device-node .d-vol.visible { display: block; }
+    .device-node:hover .d-icon { filter: drop-shadow(0 0 6px #60a5fa); }
+
+    /* ── Context menu ── */
+    #ctx-menu {
+      position: fixed;
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      padding: 4px;
+      z-index: 9000;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      display: none;
+    }
+    #ctx-menu button {
+      display: block;
+      width: 100%;
+      text-align: left;
+      background: none;
+      border: none;
+      color: var(--text);
+      padding: 7px 14px;
+      cursor: pointer;
+      font-size: 13px;
+      border-radius: 5px;
+      white-space: nowrap;
+    }
+    #ctx-menu button:hover { background: var(--surface2); }
+    #ctx-menu button.danger { color: var(--danger-t); }
+    #ctx-menu hr { border: none; border-top: 1px solid var(--border); margin: 3px 0; }
+
+    /* ── File drop overlay ── */
+    #file-drop-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(37, 99, 235, 0.12);
+      border: 3px dashed var(--accent-h);
+      z-index: 8000;
+      display: none;
+      pointer-events: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      color: var(--accent-h);
+    }
+    #file-drop-overlay.active { display: flex; }
+
+    /* ── Select styling ── */
+    select.input { appearance: none; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px; }
+    select.input option { background: #1c1f2b; color: #e0e0e0; }
+
+    /* ── Edit modal ── */
+    #edit-modal .modal { width: 380px; }
+
+    /* ── Inline add ── */
+    .select-with-add { display: flex; gap: 6px; align-items: center; }
+    .select-with-add .input { flex: 1; }
+    .inline-add { display: none; gap: 6px; align-items: center; margin-top: 6px; }
+    .inline-add.open { display: flex; }
+    .inline-add .input { flex: 1; font-size: 12px; padding: 5px 8px; }
+  </style>
+</head>
+<body>
+
+<div id="file-drop-overlay">Drop new floor plan here to replace</div>
+
+<header>
+  <a href="/" class="btn btn-neutral btn-sm" style="text-decoration:none">← Dashboard</a>
+  <h1>🖨 Floor Planner</h1>
+  <span id="floor-label">Loading…</span>
+
+  <div id="zoom-bar" title="PDF render zoom">
+    🔍
+    <input type="range" id="zoom-slider" min="0.5" max="3" step="0.25" value="1.5">
+    <span id="zoom-label">1.5×</span>
+  </div>
+
+  <button class="btn btn-neutral btn-sm" id="prev-page-btn" disabled>‹</button>
+  <span id="page-info" style="font-size:12px; color:var(--muted)"></span>
+  <button class="btn btn-neutral btn-sm" id="next-page-btn" disabled>›</button>
+
+  <label class="btn btn-neutral btn-sm" style="cursor:pointer" title="Replace floor plan">
+    🔄 Replace Plan
+    <input type="file" id="replace-input" accept=".pdf,.png,.jpg,.jpeg,.webp" style="display:none">
+  </label>
+
+  <button class="btn btn-success btn-sm" id="export-png-btn">⬇ PNG</button>
+  <button class="btn btn-success btn-sm" id="export-list-btn">📋 Export List</button>
+  <button class="btn btn-success btn-sm" id="export-print-btn">🖨 Print</button>
+
+  <div id="sync-status" style="margin-left:auto">● Loaded</div>
+</header>
+
+<div class="workspace">
+
+  <aside>
+    <div class="section-label">Devices</div>
+
+    <div class="device-tile" draggable="true" data-type="printer" data-icon="🖨" data-default-label="Printer">
+      <span class="tile-icon">🖨</span>
+      <span class="tile-name">Printer</span>
+    </div>
+    <div class="device-tile" draggable="true" data-type="mfp" data-icon="🗄" data-default-label="MFP">
+      <span class="tile-icon">🗄</span>
+      <span class="tile-name">MFP / Copier</span>
+    </div>
+    <div class="device-tile" draggable="true" data-type="scanner" data-icon="📠" data-default-label="Scanner">
+      <span class="tile-icon">📠</span>
+      <span class="tile-name">Scanner / Fax</span>
+    </div>
+    <div class="device-tile" draggable="true" data-type="server" data-icon="🖥" data-default-label="Print Server">
+      <span class="tile-icon">🖥</span>
+      <span class="tile-name">Print Server</span>
+    </div>
+
+    <hr class="div">
+    <div class="section-label">Instructions</div>
+    <div class="help-text">
+      <b>Drag</b> a tile onto the plan to place a device.<br>
+      <b>Drag</b> a placed device to move it.<br>
+      <b>Dbl-click</b> to edit details.<br>
+      <b>Right-click</b> for options.<br>
+      All changes save automatically.
+    </div>
+
+    <div id="stats-panel">Loading…</div>
+  </aside>
+
+  <div id="canvas-area">
+    <div id="empty-state">
+      <div class="big">🏢</div>
+      <p>Loading floor plan…</p>
+    </div>
+    <div id="plan-container">
+      <canvas id="floor-canvas"></canvas>
+    </div>
+  </div>
+
+</div>
+
+<!-- Context menu -->
+<div id="ctx-menu">
+  <button id="ctx-edit">✏️  Edit details</button>
+  <button id="ctx-change">🔄  Change type</button>
+  <hr>
+  <button id="ctx-delete" class="danger">🗑️  Delete</button>
+</div>
+
+<!-- Edit modal -->
+<div class="modal-backdrop" id="edit-modal">
+  <div class="modal">
+    <h2>✏️ Edit Device</h2>
+    <div class="modal-field">
+      <label>Name (shown on map)</label>
+      <input id="modal-label"  class="input" type="text" placeholder="e.g. Reception Printer">
+    </div>
+    <div class="modal-field">
+      <label>Brand</label>
+      <div class="select-with-add">
+        <select id="modal-brand" class="input">
+          <option value="">— Select brand —</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" id="add-brand-btn" type="button">+ Add</button>
+      </div>
+      <div class="inline-add" id="brand-add-row">
+        <input type="text" class="input" id="new-brand-input" placeholder="New brand name">
+        <button class="btn btn-primary btn-sm" id="save-brand-btn">Save</button>
+        <button class="btn btn-neutral btn-sm" id="cancel-brand-btn">Cancel</button>
+      </div>
+    </div>
+    <div class="modal-field">
+      <label>Model</label>
+      <div class="select-with-add">
+        <select id="modal-model" class="input">
+          <option value="">— Select brand first —</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" id="add-model-btn" type="button">+ Add</button>
+      </div>
+      <div class="inline-add" id="model-add-row">
+        <input type="text" class="input" id="new-model-input" placeholder="New model name">
+        <button class="btn btn-primary btn-sm" id="save-model-btn">Save</button>
+        <button class="btn btn-neutral btn-sm" id="cancel-model-btn">Cancel</button>
+      </div>
+    </div>
+    <div class="modal-field">
+      <label>Serial Number</label>
+      <input id="modal-serial" class="input" type="text" placeholder="e.g. VND3X12345">
+    </div>
+    <div class="modal-field" style="display:flex;gap:10px">
+      <div style="flex:1">
+        <label>Avg Mono Volume</label>
+        <input id="modal-avg-mono" class="input" type="number" min="0" placeholder="e.g. 2000">
+      </div>
+      <div style="flex:1">
+        <label>Avg Colour Volume</label>
+        <input id="modal-avg-colour" class="input" type="number" min="0" placeholder="e.g. 500">
+      </div>
+    </div>
+    <div class="modal-field">
+      <label>Notes</label>
+      <textarea id="modal-notes" class="input" placeholder="e.g. Shared with finance team, needs toner end of month"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-neutral" id="modal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="modal-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+const DEVICE_TYPES = ['printer','mfp','scanner','server'];
+const DEVICE_ICONS = { printer:'🖨', mfp:'🗄', scanner:'📠', server:'🖥' };
+const DEVICE_NAMES = { printer:'Printer', mfp:'MFP', scanner:'Scanner', server:'Print Server' };
+
+// ── Floor context ─────────────────────────────────────────────────────────────
+const floorId = new URLSearchParams(location.search).get('floor');
+if (!floorId) { alert('No floor specified.'); location.href = '/'; }
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let devices      = [];
+let counters     = {};
+let pdfDoc       = null;
+let pageNum      = 1;
+let scale        = 1.5;
+let pendingDrop  = null;
+let draggingNode = null;
+let ctxTarget    = null;
+let modalTarget  = null;
+let moveDebounce = null;
+let dragCounter  = 0;
+
+// ── DOM refs ──────────────────────────────────────────────────────────────────
+const floorCanvas    = document.getElementById('floor-canvas');
+const floorCtx       = floorCanvas.getContext('2d');
+const planContainer  = document.getElementById('plan-container');
+const canvasArea     = document.getElementById('canvas-area');
+const emptyState     = document.getElementById('empty-state');
+const syncStatus     = document.getElementById('sync-status');
+const statsPanel     = document.getElementById('stats-panel');
+const pageInfo       = document.getElementById('page-info');
+const prevBtn        = document.getElementById('prev-page-btn');
+const nextBtn        = document.getElementById('next-page-btn');
+const zoomSlider     = document.getElementById('zoom-slider');
+const zoomLabel      = document.getElementById('zoom-label');
+const ctxMenu        = document.getElementById('ctx-menu');
+
+// ── API helpers ───────────────────────────────────────────────────────────────
+
+async function apiJson(method, path, body) {
+  setSyncStatus('saving');
+  try {
+    const opts = { method, headers: {} };
+    if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+    const res = await fetch('/api' + path, opts);
+    if (!res.ok) throw new Error(await res.text());
+    setSyncStatus('saved');
+    if (res.status === 204) return null;
+    return res.json();
+  } catch (err) {
+    setSyncStatus('error');
+    throw err;
+  }
+}
+
+let syncTimer;
+function setSyncStatus(state) {
+  clearTimeout(syncTimer);
+  syncStatus.className = `sync-status ${state}`;
+  const labels = { saving: '↑ Saving…', saved: '✓ Saved', error: '✗ Error', '': '● Loaded' };
+  syncStatus.textContent = labels[state] || '● Loaded';
+  if (state === 'saved') syncTimer = setTimeout(() => setSyncStatus(''), 2000);
+}
+
+// ── Initialise ────────────────────────────────────────────────────────────────
+
+async function init() {
+  // Load floor info (by peeking at the tree or checking the floorplan endpoint)
+  try {
+    const res = await fetch(`/api/floors/${floorId}/floorplan`);
+    if (!res.ok) {
+      emptyState.querySelector('p').textContent = 'Floor plan not found.';
+      return;
+    }
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const ct   = res.headers.get('Content-Type') || '';
+    if (ct.includes('pdf')) {
+      const buf = await blob.arrayBuffer();
+      pdfDoc = await pdfjsLib.getDocument({ data: buf }).promise;
+      pageNum = 1;
+      await renderPdf();
+    } else {
+      await renderImage(url);
+    }
+  } catch (err) {
+    emptyState.querySelector('p').textContent = 'Could not load floor plan.';
+    return;
+  }
+
+  // Load existing devices
+  try {
+    const saved = await fetch(`/api/floors/${floorId}/devices`).then(r => r.json());
+    saved.forEach(d => {
+      const x = d.x_pct * floorCanvas.width;
+      const y = d.y_pct * floorCanvas.height;
+      // Re-seed counters so new auto-names don't collide
+      const n = parseInt(d.label.match(/\d+$/)?.[0] || 0);
+      if (n) counters[d.type] = Math.max(counters[d.type] || 0, n);
+      createDeviceNode(x, y, d.type, d.icon || DEVICE_ICONS[d.type], d.label, d.id, {
+        brand: d.brand, model: d.model, serial: d.serial,
+        avg_mono: d.avg_mono, avg_colour: d.avg_colour, notes: d.notes,
+      });
+    });
+  } catch (err) {
+    console.error('Failed to load devices', err);
+  }
+
+  updateStats();
+  setSyncStatus('');
+
+  // Set floor label in header
+  try {
+    const info = await fetch(`/api/floors/${floorId}`).then(r => r.json());
+    document.getElementById('floor-label').textContent =
+      `${info.client_name}  ›  ${info.city_name}  ›  ${info.building_name}  ›  ${info.label}`;
+    document.title = `${info.label} — Floor Planner`;
+  } catch { /* non-fatal */ }
+}
+
+// ── Floor plan rendering ──────────────────────────────────────────────────────
+
+async function renderPdf() {
+  const page     = await pdfDoc.getPage(pageNum);
+  const viewport = page.getViewport({ scale });
+  floorCanvas.width  = viewport.width;
+  floorCanvas.height = viewport.height;
+  await page.render({ canvasContext: floorCtx, viewport }).promise;
+  afterRender();
+}
+
+async function renderImage(url) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => {
+      floorCanvas.width  = img.naturalWidth;
+      floorCanvas.height = img.naturalHeight;
+      floorCtx.drawImage(img, 0, 0);
+      afterRender();
+      res();
+    };
+    img.onerror = rej;
+    img.src = url;
+  });
+}
+
+function afterRender() {
+  emptyState.style.display = 'none';
+  prevBtn.disabled = !pdfDoc || pageNum <= 1;
+  nextBtn.disabled = !pdfDoc || pageNum >= (pdfDoc ? pdfDoc.numPages : 1);
+  pageInfo.textContent = pdfDoc ? `${pageNum}/${pdfDoc.numPages}` : '';
+  // Reposition all existing device nodes after re-render
+  planContainer.querySelectorAll('.device-node').forEach(el => {
+    const id   = el.dataset.id;
+    const data = devices.find(d => d.id === id);
+    if (data) {
+      data.x = data.x_pct * floorCanvas.width;
+      data.y = data.y_pct * floorCanvas.height;
+      el.style.left = data.x + 'px';
+      el.style.top  = data.y + 'px';
+    }
+  });
+}
+
+// ── Zoom ──────────────────────────────────────────────────────────────────────
+
+zoomSlider.addEventListener('input', () => {
+  scale = parseFloat(zoomSlider.value);
+  zoomLabel.textContent = scale + '×';
+  if (pdfDoc) renderPdf();
+});
+
+prevBtn.addEventListener('click', async () => { if (pageNum > 1) { pageNum--; await renderPdf(); } });
+nextBtn.addEventListener('click', async () => {
+  if (pdfDoc && pageNum < pdfDoc.numPages) { pageNum++; await renderPdf(); }
+});
+
+// ── Replace floor plan ────────────────────────────────────────────────────────
+
+document.getElementById('replace-input').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  e.target.value = '';
+  const fd = new FormData();
+  fd.append('file', file);
+  setSyncStatus('saving');
+  try {
+    await fetch(`/api/floors/${floorId}/floorplan`, { method: 'POST', body: fd });
+    setSyncStatus('saved');
+    location.reload();
+  } catch (err) {
+    setSyncStatus('error');
+  }
+});
+
+// ── Sidebar drag source ───────────────────────────────────────────────────────
+
+document.querySelectorAll('.device-tile').forEach(tile => {
+  tile.addEventListener('dragstart', e => {
+    pendingDrop = { type: tile.dataset.type, icon: tile.dataset.icon, defaultLabel: tile.dataset.defaultLabel };
+    e.dataTransfer.effectAllowed = 'copy';
+  });
+  tile.addEventListener('dragend', () => { pendingDrop = null; });
+});
+
+// ── Drop onto canvas ──────────────────────────────────────────────────────────
+
+canvasArea.addEventListener('dragover', e => {
+  if (floorCanvas.width && (pendingDrop || e.dataTransfer.types.includes('Files'))) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }
+});
+
+canvasArea.addEventListener('drop', async e => {
+  e.preventDefault();
+  if (e.dataTransfer.files.length) return; // handled by window drop
+
+  if (!pendingDrop || !floorCanvas.width) return;
+  const rect = floorCanvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  if (x < 0 || y < 0 || x > floorCanvas.width || y > floorCanvas.height) return;
+
+  counters[pendingDrop.type] = (counters[pendingDrop.type] || 0) + 1;
+  const label = `${pendingDrop.defaultLabel} ${counters[pendingDrop.type]}`;
+
+  // Optimistic: create node immediately, then sync to server
+  const tempId = `temp-${Date.now()}`;
+  const node   = createDeviceNode(x, y, pendingDrop.type, pendingDrop.icon, label, tempId, {});
+  updateStats();
+  pendingDrop = null;
+
+  try {
+    const x_pct = floorCanvas.width  ? x / floorCanvas.width  : 0;
+    const y_pct = floorCanvas.height ? y / floorCanvas.height : 0;
+    const saved = await apiJson('POST', `/floors/${floorId}/devices`, {
+      type: node._data.type, label, x_pct, y_pct,
+    });
+    // Replace temp ID with real server ID
+    const oldData = devices.find(d => d.id === tempId);
+    if (oldData) { oldData.id = saved.id; oldData.x_pct = saved.x_pct; oldData.y_pct = saved.y_pct; }
+    node.dataset.id = saved.id;
+    node._data.id   = saved.id;
+  } catch (err) {
+    // Remove on failure
+    node.remove();
+    devices = devices.filter(d => d.id !== tempId);
+    updateStats();
+  }
+});
+
+// ── Full-window file drop overlay ─────────────────────────────────────────────
+
+const fileDropOverlay = document.getElementById('file-drop-overlay');
+document.body.addEventListener('dragenter', e => {
+  if (!e.dataTransfer.types.includes('Files')) return;
+  dragCounter++;
+  fileDropOverlay.classList.add('active');
+});
+document.body.addEventListener('dragleave', () => {
+  dragCounter = Math.max(0, dragCounter - 1);
+  if (!dragCounter) fileDropOverlay.classList.remove('active');
+});
+document.body.addEventListener('drop', e => {
+  dragCounter = 0;
+  fileDropOverlay.classList.remove('active');
+  if (!pendingDrop && e.dataTransfer.files.length) {
+    e.preventDefault();
+    document.getElementById('replace-input').files = e.dataTransfer.files;
+    document.getElementById('replace-input').dispatchEvent(new Event('change'));
+  }
+});
+
+// ── Create device node ────────────────────────────────────────────────────────
+
+function createDeviceNode(x, y, type, icon, label, id, extra) {
+  const data = {
+    id, x, y, type, icon, label,
+    brand:      extra.brand      || '',
+    model:      extra.model      || '',
+    serial:     extra.serial     || '',
+    avg_mono:   extra.avg_mono   || 0,
+    avg_colour: extra.avg_colour || 0,
+    notes:      extra.notes      || '',
+    x_pct: floorCanvas.width  ? x / floorCanvas.width  : 0,
+    y_pct: floorCanvas.height ? y / floorCanvas.height : 0,
+  };
+  devices.push(data);
+
+  const el = document.createElement('div');
+  el.className   = 'device-node';
+  el.dataset.id  = id;
+  el.style.left  = x + 'px';
+  el.style.top   = y + 'px';
+  el.innerHTML   = `<span class="d-icon">${icon}</span><span class="d-label">${label}</span><span class="d-vol"></span>`;
+  refreshVolLabel(el, data);
+  el._data       = data;
+
+  el.addEventListener('mousedown',   e => onNodeMouseDown(e, el, data));
+  el.addEventListener('dblclick',    e => { e.stopPropagation(); openEditModal(data, el); });
+  el.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); showCtxMenu(e.clientX, e.clientY, data, el); });
+
+  planContainer.appendChild(el);
+  return el;
+}
+
+// ── Dragging placed nodes ─────────────────────────────────────────────────────
+
+function onNodeMouseDown(e, el, data) {
+  if (e.button !== 0) return;
+  e.stopPropagation();
+  e.preventDefault();
+  const rect = floorCanvas.getBoundingClientRect();
+  draggingNode = { el, data, ox: e.clientX - rect.left - data.x, oy: e.clientY - rect.top - data.y };
+  el.style.zIndex = 50;
+}
+
+document.addEventListener('mousemove', e => {
+  if (!draggingNode) return;
+  const rect = floorCanvas.getBoundingClientRect();
+  let x = Math.max(0, Math.min(floorCanvas.width,  e.clientX - rect.left - draggingNode.ox));
+  let y = Math.max(0, Math.min(floorCanvas.height, e.clientY - rect.top  - draggingNode.oy));
+  draggingNode.data.x = x;
+  draggingNode.data.y = y;
+  draggingNode.data.x_pct = floorCanvas.width  ? x / floorCanvas.width  : 0;
+  draggingNode.data.y_pct = floorCanvas.height ? y / floorCanvas.height : 0;
+  draggingNode.el.style.left = x + 'px';
+  draggingNode.el.style.top  = y + 'px';
+});
+
+document.addEventListener('mouseup', () => {
+  if (!draggingNode) return;
+  draggingNode.el.style.zIndex = 10;
+  const data = draggingNode.data;
+  draggingNode = null;
+
+  // Debounced position save
+  clearTimeout(moveDebounce);
+  moveDebounce = setTimeout(() => {
+    if (!data.id.startsWith('temp-')) syncDevice(data);
+  }, 400);
+});
+
+// ── Context menu ──────────────────────────────────────────────────────────────
+
+function showCtxMenu(mx, my, data, el) {
+  ctxTarget = { data, el };
+  ctxMenu.style.left    = mx + 'px';
+  ctxMenu.style.top     = my + 'px';
+  ctxMenu.style.display = 'block';
+}
+document.addEventListener('click', e => { if (!ctxMenu.contains(e.target)) ctxMenu.style.display = 'none'; });
+
+document.getElementById('ctx-edit').addEventListener('click', () => {
+  ctxMenu.style.display = 'none';
+  if (ctxTarget) openEditModal(ctxTarget.data, ctxTarget.el);
+});
+
+document.getElementById('ctx-change').addEventListener('click', () => {
+  ctxMenu.style.display = 'none';
+  if (!ctxTarget) return;
+  const opts = DEVICE_TYPES.map((t, i) => `${i + 1}: ${DEVICE_NAMES[t]}`).join('\n');
+  const choice = prompt(`Change type:\n${opts}\n\nEnter number:`);
+  const idx = parseInt(choice) - 1;
+  if (idx >= 0 && idx < DEVICE_TYPES.length) {
+    const t = DEVICE_TYPES[idx];
+    ctxTarget.data.type = t;
+    ctxTarget.data.icon = DEVICE_ICONS[t];
+    ctxTarget.el.querySelector('.d-icon').textContent = DEVICE_ICONS[t];
+    syncDevice(ctxTarget.data);
+    updateStats();
+  }
+});
+
+document.getElementById('ctx-delete').addEventListener('click', () => {
+  ctxMenu.style.display = 'none';
+  if (ctxTarget) deleteDevice(ctxTarget.data, ctxTarget.el);
+});
+
+// ── Edit modal ────────────────────────────────────────────────────────────────
+
+const editBackdrop    = document.getElementById('edit-modal');
+const modalLabel      = document.getElementById('modal-label');
+const modalBrand      = document.getElementById('modal-brand');
+const modalModel      = document.getElementById('modal-model');
+const modalSerial     = document.getElementById('modal-serial');
+const modalAvgMono    = document.getElementById('modal-avg-mono');
+const modalAvgColour  = document.getElementById('modal-avg-colour');
+const modalNotes      = document.getElementById('modal-notes');
+
+let catalogue = [];
+
+async function loadCatalogue() {
+  try { catalogue = await fetch('/api/brands').then(r => r.json()); } catch { catalogue = []; }
+}
+
+function populateBrandSelect(currentBrand) {
+  modalBrand.innerHTML = '<option value="">— Select brand —</option>';
+  catalogue.forEach(b => {
+    const opt = document.createElement('option');
+    opt.value = b.name;
+    opt.textContent = b.name;
+    if (b.name === currentBrand) opt.selected = true;
+    modalBrand.appendChild(opt);
+  });
+}
+
+function populateModelSelect(brandName, currentModel) {
+  const brand = catalogue.find(b => b.name === brandName);
+  if (!brand || !brand.models.length) {
+    modalModel.innerHTML = '<option value="">— No models registered —</option>';
+    return;
+  }
+  modalModel.innerHTML = '<option value="">— Select model —</option>';
+  brand.models.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.name;
+    opt.textContent = m.name;
+    if (m.name === currentModel) opt.selected = true;
+    modalModel.appendChild(opt);
+  });
+}
+
+modalBrand.addEventListener('change', () => {
+  populateModelSelect(modalBrand.value, '');
+  document.getElementById('model-add-row').classList.remove('open');
+});
+
+// ── Inline add brand ──────────────────────────────────────────────────────────
+
+const brandAddRow    = document.getElementById('brand-add-row');
+const newBrandInput  = document.getElementById('new-brand-input');
+
+document.getElementById('add-brand-btn').addEventListener('click', () => {
+  brandAddRow.classList.toggle('open');
+  if (brandAddRow.classList.contains('open')) newBrandInput.focus();
+});
+
+document.getElementById('cancel-brand-btn').addEventListener('click', () => {
+  brandAddRow.classList.remove('open');
+  newBrandInput.value = '';
+});
+
+async function saveBrand() {
+  const name = newBrandInput.value.trim();
+  if (!name) return;
+  try {
+    const res  = await fetch('/api/brands', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    await loadCatalogue();
+    populateBrandSelect(name);
+    populateModelSelect(name, '');
+    brandAddRow.classList.remove('open');
+    newBrandInput.value = '';
+  } catch (err) { alert('Could not add brand: ' + err.message); }
+}
+
+document.getElementById('save-brand-btn').addEventListener('click', saveBrand);
+newBrandInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.stopPropagation(); saveBrand(); }
+  if (e.key === 'Escape') { brandAddRow.classList.remove('open'); newBrandInput.value = ''; }
+});
+
+// ── Inline add model ──────────────────────────────────────────────────────────
+
+const modelAddRow   = document.getElementById('model-add-row');
+const newModelInput = document.getElementById('new-model-input');
+
+document.getElementById('add-model-btn').addEventListener('click', () => {
+  if (!modalBrand.value) {
+    modalBrand.focus();
+    modalBrand.style.borderColor = 'var(--danger-t)';
+    setTimeout(() => modalBrand.style.borderColor = '', 1500);
+    return;
+  }
+  modelAddRow.classList.toggle('open');
+  if (modelAddRow.classList.contains('open')) newModelInput.focus();
+});
+
+document.getElementById('cancel-model-btn').addEventListener('click', () => {
+  modelAddRow.classList.remove('open');
+  newModelInput.value = '';
+});
+
+async function saveModel() {
+  const name  = newModelInput.value.trim();
+  if (!name) return;
+  const brand = catalogue.find(b => b.name === modalBrand.value);
+  if (!brand) return;
+  try {
+    const res = await fetch(`/api/brands/${brand.id}/models`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const currentBrand = modalBrand.value;
+    await loadCatalogue();
+    populateBrandSelect(currentBrand);
+    populateModelSelect(currentBrand, name);
+    modelAddRow.classList.remove('open');
+    newModelInput.value = '';
+  } catch (err) { alert('Could not add model: ' + err.message); }
+}
+
+document.getElementById('save-model-btn').addEventListener('click', saveModel);
+newModelInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.stopPropagation(); saveModel(); }
+  if (e.key === 'Escape') { modelAddRow.classList.remove('open'); newModelInput.value = ''; }
+});
+
+function openEditModal(data, el) {
+  modalTarget          = { data, el };
+  modalLabel.value     = data.label;
+  modalSerial.value    = data.serial    || '';
+  modalAvgMono.value   = data.avg_mono  || '';
+  modalAvgColour.value = data.avg_colour || '';
+  modalNotes.value     = data.notes     || '';
+  populateBrandSelect(data.brand || '');
+  populateModelSelect(data.brand || '', data.model || '');
+  editBackdrop.classList.add('open');
+  modalLabel.focus();
+  modalLabel.select();
+}
+function closeEditModal() {
+  editBackdrop.classList.remove('open');
+  modalTarget = null;
+  document.getElementById('brand-add-row').classList.remove('open');
+  document.getElementById('model-add-row').classList.remove('open');
+  document.getElementById('new-brand-input').value = '';
+  document.getElementById('new-model-input').value = '';
+}
+
+document.getElementById('modal-cancel').addEventListener('click', closeEditModal);
+editBackdrop.addEventListener('click', e => { if (e.target === editBackdrop) closeEditModal(); });
+
+document.getElementById('modal-save').addEventListener('click', async () => {
+  if (!modalTarget) return;
+  const { data, el } = modalTarget;
+  data.label      = modalLabel.value.trim()  || data.label;
+  data.brand      = modalBrand.value;
+  data.model      = modalModel.value;
+  data.serial     = modalSerial.value.trim();
+  data.avg_mono   = parseInt(modalAvgMono.value)   || 0;
+  data.avg_colour = parseInt(modalAvgColour.value) || 0;
+  data.notes      = modalNotes.value.trim();
+  el.querySelector('.d-label').textContent = data.label;
+  refreshVolLabel(el, data);
+  closeEditModal();
+  await syncDevice(data);
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeEditModal();
+  if (e.key === 'Enter' && editBackdrop.classList.contains('open') && e.target.tagName !== 'TEXTAREA') {
+    document.getElementById('modal-save').click();
+  }
+});
+
+// ── Delete ────────────────────────────────────────────────────────────────────
+
+function deleteDevice(data, el) {
+  devices = devices.filter(d => d.id !== data.id);
+  el.remove();
+  updateStats();
+  if (!data.id.startsWith('temp-')) apiJson('DELETE', `/devices/${data.id}`);
+}
+
+// ── Sync helpers ──────────────────────────────────────────────────────────────
+
+function syncDevice(data) {
+  return apiJson('PUT', `/devices/${data.id}`, {
+    type:       data.type,       label:      data.label,
+    brand:      data.brand,      model:      data.model,
+    serial:     data.serial,     notes:      data.notes,
+    avg_mono:   data.avg_mono,   avg_colour: data.avg_colour,
+    x_pct:      data.x_pct,      y_pct:      data.y_pct,
+  });
+}
+
+// ── Volume label helper ───────────────────────────────────────────────────────
+
+function refreshVolLabel(el, data) {
+  const span = el.querySelector('.d-vol');
+  if (!span) return;
+  const mono   = data.avg_mono   || 0;
+  const colour = data.avg_colour || 0;
+  if (mono || colour) {
+    span.textContent = `M: ${mono.toLocaleString()} | C: ${colour.toLocaleString()}`;
+    span.classList.add('visible');
+  } else {
+    span.textContent = '';
+    span.classList.remove('visible');
+  }
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+
+function updateStats() {
+  if (!devices.length) { statsPanel.textContent = 'No devices placed yet.'; return; }
+  const counts = {};
+  devices.forEach(d => counts[d.type] = (counts[d.type] || 0) + 1);
+  statsPanel.innerHTML = `<b>Total: ${devices.length}</b><br>` +
+    Object.entries(counts).map(([t, n]) => `${DEVICE_NAMES[t] || t}: ${n}`).join('<br>');
+}
+
+// ── Export PNG ────────────────────────────────────────────────────────────────
+
+function buildAnnotatedCanvas() {
+  const ec   = document.createElement('canvas');
+  ec.width   = floorCanvas.width;
+  ec.height  = floorCanvas.height;
+  const ectx = ec.getContext('2d');
+  ectx.drawImage(floorCanvas, 0, 0);
+  devices.forEach(d => {
+    const mono   = d.avg_mono   || 0;
+    const colour = d.avg_colour || 0;
+    const volText = (mono || colour) ? `M: ${mono.toLocaleString()} | C: ${colour.toLocaleString()}` : null;
+    const pad = 5, lh = 16;
+
+    ectx.font = '28px serif';
+    ectx.textAlign = 'center'; ectx.textBaseline = 'alphabetic';
+    ectx.fillText(d.icon, d.x, d.y - 2);
+
+    // Name row
+    ectx.font = 'bold 11px system-ui, sans-serif';
+    const tw = ectx.measureText(d.label).width;
+    const boxW = Math.max(tw, volText ? ectx.measureText(volText).width : 0) + pad * 2;
+    const totalH = lh + (volText ? lh : 0);
+    ectx.fillStyle = 'rgba(15,40,100,0.85)';
+    ectx.beginPath(); ectx.roundRect(d.x - boxW/2, d.y + 6, boxW, totalH, 3); ectx.fill();
+    ectx.strokeStyle = '#3b82f6'; ectx.lineWidth = 1; ectx.stroke();
+    ectx.fillStyle = '#dbeafe'; ectx.textBaseline = 'middle';
+    ectx.fillText(d.label, d.x, d.y + 6 + lh / 2);
+
+    // Volume row
+    if (volText) {
+      ectx.font = '9px system-ui, sans-serif';
+      ectx.fillStyle = '#93c5fd';
+      ectx.fillText(volText, d.x, d.y + 6 + lh + lh / 2);
+    }
+  });
+  return ec;
+}
+
+document.getElementById('export-png-btn').addEventListener('click', () => {
+  const ec = buildAnnotatedCanvas();
+  const a  = document.createElement('a');
+  a.href   = ec.toDataURL('image/png');
+  a.download = `floor-${floorId}-layout.png`;
+  a.click();
+});
+
+document.getElementById('export-print-btn').addEventListener('click', () => {
+  const src = buildAnnotatedCanvas().toDataURL('image/png');
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>Floor ${floorId} Layout</title>
+    <style>* {margin:0;padding:0} img {width:100%;height:auto} @media print {@page{margin:0}}</style>
+    </head><body><img src="${src}"><script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);
+  win.document.close();
+});
+
+// ── Export CSV ────────────────────────────────────────────────────────────────
+
+document.getElementById('export-list-btn').addEventListener('click', () => {
+  if (!devices.length) { alert('No devices placed yet.'); return; }
+  const rows = [
+    ['#','Label','Type','Brand','Model','Serial Number','Avg Mono Vol','Avg Colour Vol','Notes','X (%)','Y (%)'],
+    ...devices.map((d, i) => [
+      i + 1, d.label, DEVICE_NAMES[d.type] || d.type,
+      d.brand || '', d.model || '', d.serial || '',
+      d.avg_mono || 0, d.avg_colour || 0, d.notes || '',
+      (d.x_pct * 100).toFixed(1) + '%', (d.y_pct * 100).toFixed(1) + '%',
+    ]),
+  ];
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const a   = document.createElement('a');
+  a.href    = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = `floor-${floorId}-devices.csv`;
+  a.click();
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+loadCatalogue();
+init();
+</script>
+</body>
+</html>

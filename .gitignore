@@ -1,0 +1,16 @@
+# Database and uploads (live on the host via Docker volume)
+*.db
+uploads/
+data/
+
+# Logs
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# OS
+.DS_Store

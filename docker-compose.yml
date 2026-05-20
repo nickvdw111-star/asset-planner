@@ -1,0 +1,10 @@
+services:
+  printer-planner:
+    image: printer-planner:latest
+    build: .
+    container_name: printer-planner
+    ports:
+      - "5050:5050"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped

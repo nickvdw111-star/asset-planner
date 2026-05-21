@@ -231,7 +231,7 @@
   <h1>📋 Asset Planner</h1>
   <span class="subtitle">Device Management Dashboard</span>
   <div style="margin-left:auto; display:flex; gap:8px;">
-    <a href="/tco"   class="btn btn-neutral" style="text-decoration:none">💰 TCO Calculator</a>
+    <a id="tco-link" href="/tco" class="btn btn-neutral" style="text-decoration:none">💰 TCO Calculator</a>
     <a href="/admin" class="btn btn-neutral" style="text-decoration:none">🗂 Device Catalogue</a>
   </div>
 </header>
@@ -627,6 +627,7 @@ function renderClientPanel() {
   document.getElementById('client-actions').classList.remove('hidden');
   document.getElementById('tree-scroll').style.display = 'block';
   document.getElementById('edit-client-btn').style.display = 'inline-flex';
+  document.getElementById('tco-link').href = `/tco?client=${activeClient.id}`;
 
   // Stats
   let totalBuildings = 0, totalDevices = 0;

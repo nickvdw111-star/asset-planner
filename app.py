@@ -398,6 +398,23 @@ def update_client(cid):
         row = db.execute('SELECT * FROM clients WHERE id=?', (cid,)).fetchone()
     return jsonify(dict(row))
 
+@app.route('/api/clients/<int:cid>/devices', methods=['GET'])
+def list_client_devices(cid):
+    with get_db() as db:
+        rows = db.execute('''
+            SELECT d.*,
+                   b.name  AS building_name,
+                   f.label AS floor_label,
+                   ci.name AS city_name
+            FROM devices d
+            JOIN floors    f  ON f.id  = d.floor_id
+            JOIN buildings b  ON b.id  = f.building_id
+            JOIN cities    ci ON ci.id = b.city_id
+            WHERE ci.client_id = ?
+            ORDER BY ci.name, b.name, f.level, d.label
+        ''', (cid,)).fetchall()
+    return jsonify([dict(r) for r in rows])
+
 @app.route('/api/clients/<int:cid>', methods=['DELETE'])
 def delete_client(cid):
     with get_db() as db:

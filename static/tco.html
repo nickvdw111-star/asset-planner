@@ -18,25 +18,66 @@
     }
     header h1 { font-size: 17px; font-weight: 600; }
 
+    /* Client picker bar */
+    #client-bar {
+      padding: 10px 20px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    #client-bar label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+    #client-sel {
+      flex: 0 0 260px;
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 13px;
+      padding: 7px 10px;
+      outline: none;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    #client-sel:focus { border-color: var(--accent-h); }
+    #client-sel option { background: var(--surface2); }
+    #load-status { font-size: 12px; color: var(--muted); }
+
     .tco-wrap {
       flex: 1;
       overflow: auto;
       padding: 20px 24px;
     }
 
-    /* ── Table ── */
-    .tco-table-wrap {
-      min-width: 100%;
-      overflow-x: auto;
+    /* Summary cards */
+    .summary-bar {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
     }
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 18px;
+      min-width: 150px;
+    }
+    .summary-card .sc-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .summary-card .sc-value { font-size: 20px; font-weight: 700; color: var(--text); }
+    .summary-card.highlight .sc-value { color: #4ade80; }
+
+    /* Table */
+    .tco-table-wrap { overflow-x: auto; }
 
     #tco-table {
       width: 100%;
       border-collapse: collapse;
       font-size: 13px;
-      min-width: 1100px;
+      min-width: 1180px;
     }
-
     #tco-table th {
       background: var(--surface);
       color: var(--muted);
@@ -44,23 +85,19 @@
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      padding: 10px 10px;
+      padding: 10px 8px;
       border-bottom: 2px solid var(--border2);
       white-space: nowrap;
       text-align: left;
     }
-    #tco-table th.tco-col,
-    #tco-table td.tco-col { text-align: right; }
-
     #tco-table td {
-      padding: 6px 6px;
+      padding: 5px 6px;
       border-bottom: 1px solid var(--border);
       vertical-align: middle;
     }
-
     #tco-table tbody tr:hover td { background: var(--surface2); }
 
-    /* ── Inline inputs ── */
+    /* Inline inputs */
     .tco-input {
       background: transparent;
       border: 1px solid transparent;
@@ -74,115 +111,65 @@
       transition: border-color 0.15s, background 0.15s;
       box-sizing: border-box;
     }
-    .tco-input:focus, .tco-input:hover {
-      border-color: var(--border2);
-      background: var(--bg);
-    }
+    .tco-input:focus, .tco-input:hover { border-color: var(--border2); background: var(--bg); }
     .tco-input[type="number"] { text-align: right; }
     select.tco-input { cursor: pointer; }
     select.tco-input option { background: var(--surface2); }
 
-    /* column widths */
-    .col-num     { width: 36px; color: var(--muted2); text-align: center; font-size: 11px; }
-    .col-brand   { width: 130px; }
-    .col-model   { width: 150px; }
-    .col-serial  { width: 130px; }
-    .col-vol     { width: 110px; }
-    .col-rate    { width: 100px; }
-    .col-rental  { width: 110px; }
-    .col-period  { width: 110px; }
-    .col-tco     { width: 120px; }
-    .col-del     { width: 36px; }
+    /* Device name cell */
+    .device-name-wrap { display: flex; flex-direction: column; gap: 1px; }
+    .device-location { font-size: 11px; color: var(--muted2); padding: 0 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    /* TCO value cell */
+    /* Column widths */
+    .col-num    { width: 32px; color: var(--muted2); text-align: center; font-size: 11px; }
+    .col-device { width: 160px; }
+    .col-brand  { width: 120px; }
+    .col-model  { width: 140px; }
+    .col-serial { width: 120px; }
+    .col-vol    { width: 100px; }
+    .col-rate   { width: 95px; }
+    .col-rental { width: 100px; }
+    .col-period { width: 100px; }
+    .col-tco    { width: 115px; text-align: right; }
+    .col-del    { width: 32px; }
+
+    /* TCO value */
     .tco-value {
       font-weight: 700;
-      font-size: 13px;
       color: var(--accent-h);
       text-align: right;
       padding-right: 10px;
       white-space: nowrap;
     }
+    .tco-value.zero { color: var(--muted2); font-weight: 400; }
 
-    /* ── Totals footer ── */
+    /* Footer */
     #tco-table tfoot td {
       border-top: 2px solid var(--border2);
       border-bottom: none;
       padding: 10px 6px;
     }
-    .totals-label {
-      color: var(--muted);
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      text-align: right;
-      padding-right: 10px;
-    }
-    .totals-tco {
-      font-size: 16px;
-      font-weight: 700;
-      color: #4ade80;
-      text-align: right;
-      padding-right: 10px;
-      white-space: nowrap;
-    }
-    .totals-sub {
-      font-size: 11px;
-      color: var(--muted);
-      text-align: right;
-      padding-right: 10px;
-      white-space: nowrap;
-    }
+    .totals-label { color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; text-align: right; padding-right: 10px; }
+    .totals-tco   { font-size: 16px; font-weight: 700; color: #4ade80; text-align: right; padding-right: 10px; white-space: nowrap; }
 
-    /* ── Delete btn ── */
+    /* Delete btn */
     .del-btn {
-      background: none;
-      border: none;
-      color: var(--muted2);
-      cursor: pointer;
-      font-size: 14px;
-      padding: 4px 6px;
-      border-radius: 4px;
-      line-height: 1;
+      background: none; border: none; color: var(--muted2); cursor: pointer;
+      font-size: 14px; padding: 4px 6px; border-radius: 4px; line-height: 1;
       transition: color 0.1s, background 0.1s;
     }
     .del-btn:hover { color: var(--danger-t); background: rgba(239,68,68,0.1); }
 
-    /* ── Empty state ── */
+    /* Empty state */
     #empty-hint {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 60px 20px;
-      color: var(--muted2);
-      gap: 12px;
-      text-align: center;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 60px 20px; color: var(--muted2); gap: 12px; text-align: center;
     }
     #empty-hint .big { font-size: 48px; opacity: 0.35; }
     #empty-hint p { font-size: 13px; line-height: 1.7; }
     #empty-hint.hidden { display: none; }
 
-    /* ── Summary cards ── */
-    .summary-bar {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 20px;
-      flex-wrap: wrap;
-    }
-    .summary-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px 18px;
-      min-width: 160px;
-    }
-    .summary-card .sc-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
-    .summary-card .sc-value { font-size: 20px; font-weight: 700; color: var(--text); }
-    .summary-card.highlight .sc-value { color: #4ade80; }
-
-    /* ── Toast ── */
+    /* Toast */
     #toast {
       position: fixed; bottom: 24px; left: 50%;
       transform: translateX(-50%) translateY(80px);
@@ -197,7 +184,7 @@
 <body>
 
 <header>
-  <a href="/" class="btn btn-neutral btn-sm" style="text-decoration:none">← Dashboard</a>
+  <a id="back-btn" href="/" class="btn btn-neutral btn-sm" style="text-decoration:none">← Dashboard</a>
   <h1>💰 TCO Calculator</h1>
   <span style="font-size:12px; color:var(--muted)">Total Cost of Ownership — monthly per device</span>
   <div style="margin-left:auto; display:flex; gap:8px;">
@@ -205,6 +192,15 @@
     <button class="btn btn-primary btn-sm" id="add-btn">+ Add Device</button>
   </div>
 </header>
+
+<!-- Client selector -->
+<div id="client-bar">
+  <label>Client</label>
+  <select id="client-sel">
+    <option value="">— Select a client —</option>
+  </select>
+  <span id="load-status"></span>
+</div>
 
 <div class="tco-wrap">
 
@@ -215,11 +211,11 @@
       <div class="sc-value" id="sum-devices">0</div>
     </div>
     <div class="summary-card">
-      <div class="sc-label">Mono volume / mo</div>
+      <div class="sc-label">Mono pages / mo</div>
       <div class="sc-value" id="sum-mono">0</div>
     </div>
     <div class="summary-card">
-      <div class="sc-label">Colour volume / mo</div>
+      <div class="sc-label">Colour pages / mo</div>
       <div class="sc-value" id="sum-colour">0</div>
     </div>
     <div class="summary-card">
@@ -242,6 +238,7 @@
       <thead>
         <tr>
           <th class="col-num">#</th>
+          <th class="col-device">Device</th>
           <th class="col-brand">Brand</th>
           <th class="col-model">Model</th>
           <th class="col-serial">Serial No</th>
@@ -251,14 +248,14 @@
           <th class="col-rate" style="text-align:right">Colour Rate<br><span style="font-weight:400;text-transform:none;letter-spacing:0">(R/page)</span></th>
           <th class="col-rental" style="text-align:right">Rental<br><span style="font-weight:400;text-transform:none;letter-spacing:0">(R/mo)</span></th>
           <th class="col-period">Period</th>
-          <th class="col-tco tco-col">Monthly TCO</th>
+          <th class="col-tco" style="text-align:right">Monthly TCO</th>
           <th class="col-del"></th>
         </tr>
       </thead>
       <tbody id="tco-body"></tbody>
       <tfoot>
         <tr id="totals-row" style="display:none">
-          <td colspan="10" class="totals-label">TOTAL</td>
+          <td colspan="11" class="totals-label">TOTAL</td>
           <td class="totals-tco" id="total-tco">R 0.00</td>
           <td></td>
         </tr>
@@ -266,10 +263,10 @@
     </table>
   </div>
 
-  <!-- Empty hint -->
+  <!-- Empty state -->
   <div id="empty-hint">
     <div class="big">💰</div>
-    <p>No devices yet.<br>Click <strong>+ Add Device</strong> to start building your TCO model.</p>
+    <p>Select a client above to load their devices,<br>or click <strong>+ Add Device</strong> to build a model manually.</p>
   </div>
 
 </div>
@@ -277,54 +274,99 @@
 <div id="toast"></div>
 
 <script>
-// ── Catalogue ────────────────────────────────────────────────────────────────
+// ── Catalogue ─────────────────────────────────────────────────────────────────
 
 let catalogue = [];
 
 async function loadCatalogue() {
-  try {
-    const res = await fetch('/api/brands');
-    catalogue = await res.json();
-  } catch { catalogue = []; }
+  try { catalogue = await (await fetch('/api/brands')).json(); } catch { catalogue = []; }
 }
 
 function brandOptions(selected = '') {
-  let html = '<option value="">— Brand —</option>';
-  catalogue.forEach(b => {
-    html += `<option value="${esc(b.name)}"${b.name === selected ? ' selected' : ''}>${esc(b.name)}</option>`;
-  });
-  return html;
+  let h = '<option value="">— Brand —</option>';
+  catalogue.forEach(b => { h += `<option value="${esc(b.name)}"${b.name===selected?' selected':''}>${esc(b.name)}</option>`; });
+  return h;
 }
-
 function modelOptions(brandName, selected = '') {
   const brand = catalogue.find(b => b.name === brandName);
-  if (!brand || !brand.models.length) return '<option value="">— Model —</option>';
-  let html = '<option value="">— Model —</option>';
-  brand.models.forEach(m => {
-    html += `<option value="${esc(m.name)}"${m.name === selected ? ' selected' : ''}>${esc(m.name)}</option>`;
-  });
-  return html;
+  if (!brand?.models?.length) return '<option value="">— Model —</option>';
+  let h = '<option value="">— Model —</option>';
+  brand.models.forEach(m => { h += `<option value="${esc(m.name)}"${m.name===selected?' selected':''}>${esc(m.name)}</option>`; });
+  return h;
 }
-
 function esc(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 }
 
-// ── Rows ─────────────────────────────────────────────────────────────────────
+// ── Clients ───────────────────────────────────────────────────────────────────
 
-let rows = [];
+let clients = [];
+
+async function loadClients() {
+  try { clients = await (await fetch('/api/clients')).json(); } catch { clients = []; }
+  const sel = document.getElementById('client-sel');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— Select a client —</option>';
+  clients.forEach(c => {
+    const o = document.createElement('option');
+    o.value = c.id; o.textContent = c.name;
+    sel.appendChild(o);
+  });
+  if (prev && clients.find(c => c.id == prev)) sel.value = prev;
+}
+
+document.getElementById('client-sel').addEventListener('change', async e => {
+  const id = parseInt(e.target.value);
+  if (!id) {
+    rows = [];
+    renderRows();
+    setStatus('');
+    document.getElementById('back-btn').href = '/';
+    return;
+  }
+  await loadClientDevices(id);
+  document.getElementById('back-btn').href = `/?client=${id}`;
+});
+
+async function loadClientDevices(clientId) {
+  setStatus('Loading…');
+  try {
+    const devices = await (await fetch(`/api/clients/${clientId}/devices`)).json();
+    rows = devices.map(d => ({
+      id:          nextId++,
+      device_name: d.label || '',
+      location:    `${d.building_name} · ${d.floor_label}`,
+      brand:       d.brand        || '',
+      model:       d.model        || '',
+      serial:      d.serial       || '',
+      mono_vol:    d.avg_mono     || 0,
+      colour_vol:  d.avg_colour   || 0,
+      mono_rate:   d.mono_rate    || 0,
+      colour_rate: d.colour_rate  || 0,
+      rental:      d.rental_amount|| 0,
+      period:      d.rental_period|| '',
+    }));
+    renderRows();
+    setStatus(devices.length ? `${devices.length} device${devices.length!==1?'s':''} loaded` : 'No devices found for this client');
+  } catch {
+    setStatus('Could not load devices');
+  }
+}
+
+function setStatus(msg) {
+  document.getElementById('load-status').textContent = msg;
+}
+
+// ── Rows ──────────────────────────────────────────────────────────────────────
+
+let rows  = [];
 let nextId = 1;
 
 function addRow(data = {}) {
-  const id = nextId++;
-  rows.push({ id, ...data });
+  rows.push({ id: nextId++, device_name:'', location:'', brand:'', model:'', serial:'', mono_vol:0, colour_vol:0, mono_rate:0, colour_rate:0, rental:0, period:'', ...data });
   renderRows();
-  // focus first empty field in the new row
-  const row = document.getElementById(`row-${id}`);
-  if (row) {
-    const first = row.querySelector('select, input');
-    if (first) first.focus();
-  }
+  const last = document.querySelector(`#tco-body tr:last-child .r-device`);
+  if (last) last.focus();
 }
 
 function removeRow(id) {
@@ -336,20 +378,21 @@ function getRowData(id) {
   const el = document.getElementById(`row-${id}`);
   if (!el) return null;
   return {
-    brand:         el.querySelector('.r-brand').value,
-    model:         el.querySelector('.r-model').value,
-    serial:        el.querySelector('.r-serial').value.trim(),
-    mono_vol:      parseFloat(el.querySelector('.r-mono-vol').value)    || 0,
-    colour_vol:    parseFloat(el.querySelector('.r-colour-vol').value)  || 0,
-    mono_rate:     parseFloat(el.querySelector('.r-mono-rate').value)   || 0,
-    colour_rate:   parseFloat(el.querySelector('.r-colour-rate').value) || 0,
-    rental:        parseFloat(el.querySelector('.r-rental').value)      || 0,
-    period:        el.querySelector('.r-period').value,
+    device_name: el.querySelector('.r-device').value,
+    brand:       el.querySelector('.r-brand').value,
+    model:       el.querySelector('.r-model').value,
+    serial:      el.querySelector('.r-serial').value.trim(),
+    mono_vol:    parseFloat(el.querySelector('.r-mono-vol').value)    || 0,
+    colour_vol:  parseFloat(el.querySelector('.r-colour-vol').value)  || 0,
+    mono_rate:   parseFloat(el.querySelector('.r-mono-rate').value)   || 0,
+    colour_rate: parseFloat(el.querySelector('.r-colour-rate').value) || 0,
+    rental:      parseFloat(el.querySelector('.r-rental').value)      || 0,
+    period:      el.querySelector('.r-period').value,
   };
 }
 
 function calcTco(d) {
-  return (d.mono_vol * d.mono_rate) + (d.colour_vol * d.colour_rate) + d.rental;
+  return (d.mono_vol * d.mono_rate) + (d.colour_vol * d.colour_rate) + (d.rental || 0);
 }
 
 function fmt(n) {
@@ -357,58 +400,57 @@ function fmt(n) {
 }
 
 function renderRows() {
+  // Snapshot current DOM values before re-render
+  rows.forEach(r => { const d = getRowData(r.id); if (d) Object.assign(r, d); });
+
   const tbody = document.getElementById('tco-body');
-
-  // Update row data from DOM before re-render (preserve edits)
-  rows.forEach(r => {
-    const d = getRowData(r.id);
-    if (d) Object.assign(r, d);
-  });
-
   tbody.innerHTML = rows.map((r, i) => {
     const tco = calcTco(r);
+    const tcoClass = tco === 0 ? 'tco-value zero' : 'tco-value';
     return `
     <tr id="row-${r.id}">
       <td class="col-num">${i + 1}</td>
+      <td class="col-device">
+        <div class="device-name-wrap">
+          <input class="tco-input r-device" type="text" value="${esc(r.device_name)}" placeholder="Device name">
+          ${r.location ? `<div class="device-location" title="${esc(r.location)}">📍 ${esc(r.location)}</div>` : ''}
+        </div>
+      </td>
       <td class="col-brand">
-        <select class="tco-input r-brand" data-id="${r.id}">
-          ${brandOptions(r.brand)}
-        </select>
+        <select class="tco-input r-brand" data-id="${r.id}">${brandOptions(r.brand)}</select>
       </td>
       <td class="col-model">
-        <select class="tco-input r-model" data-id="${r.id}">
-          ${modelOptions(r.brand, r.model)}
-        </select>
+        <select class="tco-input r-model" data-id="${r.id}">${modelOptions(r.brand, r.model)}</select>
       </td>
       <td class="col-serial">
-        <input class="tco-input r-serial" type="text" value="${esc(r.serial || '')}" placeholder="optional">
+        <input class="tco-input r-serial" type="text" value="${esc(r.serial)}" placeholder="optional">
       </td>
       <td class="col-vol">
-        <input class="tco-input r-mono-vol" type="number" min="0" value="${r.mono_vol || ''}" placeholder="0" data-id="${r.id}">
+        <input class="tco-input r-mono-vol" type="number" min="0" value="${r.mono_vol||''}" placeholder="0" data-id="${r.id}">
       </td>
       <td class="col-vol">
-        <input class="tco-input r-colour-vol" type="number" min="0" value="${r.colour_vol || ''}" placeholder="0" data-id="${r.id}">
+        <input class="tco-input r-colour-vol" type="number" min="0" value="${r.colour_vol||''}" placeholder="0" data-id="${r.id}">
       </td>
       <td class="col-rate">
-        <input class="tco-input r-mono-rate" type="number" min="0" step="0.001" value="${r.mono_rate || ''}" placeholder="0.000" data-id="${r.id}">
+        <input class="tco-input r-mono-rate" type="number" min="0" step="0.001" value="${r.mono_rate||''}" placeholder="0.000" data-id="${r.id}">
       </td>
       <td class="col-rate">
-        <input class="tco-input r-colour-rate" type="number" min="0" step="0.001" value="${r.colour_rate || ''}" placeholder="0.000" data-id="${r.id}">
+        <input class="tco-input r-colour-rate" type="number" min="0" step="0.001" value="${r.colour_rate||''}" placeholder="0.000" data-id="${r.id}">
       </td>
       <td class="col-rental">
-        <input class="tco-input r-rental" type="number" min="0" step="0.01" value="${r.rental || ''}" placeholder="0.00" data-id="${r.id}">
+        <input class="tco-input r-rental" type="number" min="0" step="0.01" value="${r.rental||''}" placeholder="0.00" data-id="${r.id}">
       </td>
       <td class="col-period">
         <select class="tco-input r-period" data-id="${r.id}">
-          <option value=""${!r.period ? ' selected' : ''}>No rental</option>
-          <option value="12"${r.period==='12' ? ' selected' : ''}>12 months</option>
-          <option value="24"${r.period==='24' ? ' selected' : ''}>24 months</option>
-          <option value="36"${r.period==='36' ? ' selected' : ''}>36 months</option>
-          <option value="72"${r.period==='72' ? ' selected' : ''}>72 months</option>
-          <option value="Evergreen"${r.period==='Evergreen' ? ' selected' : ''}>Evergreen</option>
+          <option value=""${!r.period?' selected':''}>No rental</option>
+          <option value="12"${r.period==='12'?' selected':''}>12 mo</option>
+          <option value="24"${r.period==='24'?' selected':''}>24 mo</option>
+          <option value="36"${r.period==='36'?' selected':''}>36 mo</option>
+          <option value="72"${r.period==='72'?' selected':''}>72 mo</option>
+          <option value="Evergreen"${r.period==='Evergreen'?' selected':''}>Evergreen</option>
         </select>
       </td>
-      <td class="col-tco tco-value" id="tco-${r.id}">${fmt(tco)}</td>
+      <td class="${tcoClass}" id="tco-${r.id}">${fmt(tco)}</td>
       <td class="col-del">
         <button class="del-btn" data-id="${r.id}" title="Remove">✕</button>
       </td>
@@ -421,36 +463,24 @@ function renderRows() {
 }
 
 function bindRowEvents() {
-  // Brand change → refresh model dropdown
   document.querySelectorAll('.r-brand').forEach(sel => {
     sel.addEventListener('change', e => {
       const id = parseInt(e.target.dataset.id);
       const row = rows.find(r => r.id === id);
       if (row) { row.brand = e.target.value; row.model = ''; }
-      // Replace model select in same row
       const tr = document.getElementById(`row-${id}`);
       if (tr) tr.querySelector('.r-model').innerHTML = modelOptions(e.target.value, '');
       recalcRow(id);
     });
   });
 
-  // Any numeric input change → recalc
   document.querySelectorAll('.r-mono-vol,.r-colour-vol,.r-mono-rate,.r-colour-rate,.r-rental,.r-model,.r-period').forEach(el => {
-    el.addEventListener('input', e => {
-      const id = parseInt(e.target.dataset.id);
-      if (id) recalcRow(id);
-    });
-    el.addEventListener('change', e => {
-      const id = parseInt(e.target.dataset.id);
-      if (id) recalcRow(id);
-    });
+    el.addEventListener('input',  e => { const id = parseInt(e.target.dataset.id); if (id) recalcRow(id); });
+    el.addEventListener('change', e => { const id = parseInt(e.target.dataset.id); if (id) recalcRow(id); });
   });
 
-  // Delete buttons
   document.querySelectorAll('.del-btn').forEach(btn => {
-    btn.addEventListener('click', e => {
-      removeRow(parseInt(e.currentTarget.dataset.id));
-    });
+    btn.addEventListener('click', e => removeRow(parseInt(e.currentTarget.dataset.id)));
   });
 }
 
@@ -459,30 +489,30 @@ function recalcRow(id) {
   if (!d) return;
   const tco = calcTco(d);
   const cell = document.getElementById(`tco-${id}`);
-  if (cell) cell.textContent = fmt(tco);
+  if (cell) {
+    cell.textContent = fmt(tco);
+    cell.className = tco === 0 ? 'tco-value zero' : 'tco-value';
+  }
   updateTotals();
 }
 
 function updateTotals() {
   let totalTco = 0, totalMono = 0, totalColour = 0, totalClicks = 0, totalRental = 0;
-
   rows.forEach(r => {
     const d = getRowData(r.id) || r;
-    totalMono    += d.mono_vol   || 0;
-    totalColour  += d.colour_vol || 0;
-    totalClicks  += (d.mono_vol * d.mono_rate) + (d.colour_vol * d.colour_rate);
-    totalRental  += d.rental     || 0;
-    totalTco     += calcTco(d);
+    totalMono   += d.mono_vol   || 0;
+    totalColour += d.colour_vol || 0;
+    totalClicks += (d.mono_vol * d.mono_rate) + (d.colour_vol * d.colour_rate);
+    totalRental += d.rental     || 0;
+    totalTco    += calcTco(d);
   });
-
-  document.getElementById('total-tco').textContent   = fmt(totalTco);
+  document.getElementById('total-tco').textContent    = fmt(totalTco);
   document.getElementById('sum-devices').textContent  = rows.length;
   document.getElementById('sum-mono').textContent     = totalMono.toLocaleString('en-ZA');
   document.getElementById('sum-colour').textContent   = totalColour.toLocaleString('en-ZA');
   document.getElementById('sum-clicks').textContent   = fmt(totalClicks);
   document.getElementById('sum-rental').textContent   = fmt(totalRental);
   document.getElementById('sum-tco').textContent      = fmt(totalTco);
-
   document.getElementById('totals-row').style.display  = rows.length ? '' : 'none';
   document.getElementById('summary-bar').style.display = rows.length ? 'flex' : 'none';
 }
@@ -495,31 +525,29 @@ function updateEmptyState() {
 
 document.getElementById('export-btn').addEventListener('click', () => {
   if (!rows.length) { toast('Nothing to export'); return; }
-  const headers = ['#','Brand','Model','Serial No','Mono Vol','Colour Vol','Mono Rate','Colour Rate','Rental','Period','Monthly TCO'];
+  const headers = ['#','Device','Location','Brand','Model','Serial No','Mono Vol','Colour Vol','Mono Rate','Colour Rate','Rental','Period','Monthly TCO'];
   const csvRows = [headers.join(',')];
   rows.forEach((r, i) => {
     const d = getRowData(r.id) || r;
-    const tco = calcTco(d);
     csvRows.push([
-      i + 1,
-      `"${(d.brand  || '').replace(/"/g,'""')}"`,
-      `"${(d.model  || '').replace(/"/g,'""')}"`,
-      `"${(d.serial || '').replace(/"/g,'""')}"`,
+      i+1,
+      `"${(d.device_name||'').replace(/"/g,'""')}"`,
+      `"${(r.location||'').replace(/"/g,'""')}"`,
+      `"${(d.brand||'').replace(/"/g,'""')}"`,
+      `"${(d.model||'').replace(/"/g,'""')}"`,
+      `"${(d.serial||'').replace(/"/g,'""')}"`,
       d.mono_vol, d.colour_vol,
       d.mono_rate, d.colour_rate,
       d.rental,
-      `"${d.period || 'No rental'}"`,
-      tco.toFixed(2),
+      `"${d.period||'No rental'}"`,
+      calcTco(d).toFixed(2),
     ].join(','));
   });
-
-  // Totals row
-  const allData = rows.map(r => getRowData(r.id) || r);
-  const grandTco = allData.reduce((s, d) => s + calcTco(d), 0);
-  csvRows.push(['TOTAL','','','','','','','','','',grandTco.toFixed(2)].join(','));
-
+  const grand = rows.reduce((s,r) => s + calcTco(getRowData(r.id)||r), 0);
+  csvRows.push(['TOTAL','','','','','','','','','','','',grand.toFixed(2)].join(','));
   const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
   a.download = `tco-${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
   toast('CSV exported');
@@ -540,8 +568,17 @@ function toast(msg) {
 
 document.getElementById('add-btn').addEventListener('click', () => addRow());
 
-loadCatalogue().then(() => {
-  updateEmptyState();
+const urlParams   = new URLSearchParams(location.search);
+const urlClientId = parseInt(urlParams.get('client'));
+if (urlClientId) document.getElementById('back-btn').href = `/?client=${urlClientId}`;
+
+Promise.all([loadClients(), loadCatalogue()]).then(() => {
+  if (urlClientId) {
+    document.getElementById('client-sel').value = urlClientId;
+    loadClientDevices(urlClientId);
+  } else {
+    updateEmptyState();
+  }
 });
 </script>
 </body>

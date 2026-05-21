@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TCO Calculator — Asset Planner</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    header {
+      padding: 12px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 17px; font-weight: 600; }
+
+    .tco-wrap {
+      flex: 1;
+      overflow: auto;
+      padding: 20px 24px;
+    }
+
+    /* ── Table ── */
+    .tco-table-wrap {
+      min-width: 100%;
+      overflow-x: auto;
+    }
+
+    #tco-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      min-width: 1100px;
+    }
+
+    #tco-table th {
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 10px 10px;
+      border-bottom: 2px solid var(--border2);
+      white-space: nowrap;
+      text-align: left;
+    }
+    #tco-table th.tco-col,
+    #tco-table td.tco-col { text-align: right; }
+
+    #tco-table td {
+      padding: 6px 6px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+
+    #tco-table tbody tr:hover td { background: var(--surface2); }
+
+    /* ── Inline inputs ── */
+    .tco-input {
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 5px;
+      color: var(--text);
+      font-size: 13px;
+      font-family: inherit;
+      padding: 4px 7px;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.15s, background 0.15s;
+      box-sizing: border-box;
+    }
+    .tco-input:focus, .tco-input:hover {
+      border-color: var(--border2);
+      background: var(--bg);
+    }
+    .tco-input[type="number"] { text-align: right; }
+    select.tco-input { cursor: pointer; }
+    select.tco-input option { background: var(--surface2); }
+
+    /* column widths */
+    .col-num     { width: 36px; color: var(--muted2); text-align: center; font-size: 11px; }
+    .col-brand   { width: 130px; }
+    .col-model   { width: 150px; }
+    .col-serial  { width: 130px; }
+    .col-vol     { width: 110px; }
+    .col-rate    { width: 100px; }
+    .col-rental  { width: 110px; }
+    .col-period  { width: 110px; }
+    .col-tco     { width: 120px; }
+    .col-del     { width: 36px; }
+
+    /* TCO value cell */
+    .tco-value {
+      font-weight: 700;
+      font-size: 13px;
+      color: var(--accent-h);
+      text-align: right;
+      padding-right: 10px;
+      white-space: nowrap;
+    }
+
+    /* ── Totals footer ── */
+    #tco-table tfoot td {
+      border-top: 2px solid var(--border2);
+      border-bottom: none;
+      padding: 10px 6px;
+    }
+    .totals-label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      text-align: right;
+      padding-right: 10px;
+    }
+    .totals-tco {
+      font-size: 16px;
+      font-weight: 700;
+      color: #4ade80;
+      text-align: right;
+      padding-right: 10px;
+      white-space: nowrap;
+    }
+    .totals-sub {
+      font-size: 11px;
+      color: var(--muted);
+      text-align: right;
+      padding-right: 10px;
+      white-space: nowrap;
+    }
+
+    /* ── Delete btn ── */
+    .del-btn {
+      background: none;
+      border: none;
+      color: var(--muted2);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 4px 6px;
+      border-radius: 4px;
+      line-height: 1;
+      transition: color 0.1s, background 0.1s;
+    }
+    .del-btn:hover { color: var(--danger-t); background: rgba(239,68,68,0.1); }
+
+    /* ── Empty state ── */
+    #empty-hint {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+      color: var(--muted2);
+      gap: 12px;
+      text-align: center;
+    }
+    #empty-hint .big { font-size: 48px; opacity: 0.35; }
+    #empty-hint p { font-size: 13px; line-height: 1.7; }
+    #empty-hint.hidden { display: none; }
+
+    /* ── Summary cards ── */
+    .summary-bar {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 18px;
+      min-width: 160px;
+    }
+    .summary-card .sc-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .summary-card .sc-value { font-size: 20px; font-weight: 700; color: var(--text); }
+    .summary-card.highlight .sc-value { color: #4ade80; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; bottom: 24px; left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--surface2); border: 1px solid var(--border2);
+      border-radius: 8px; padding: 10px 18px; font-size: 13px; color: var(--text);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4); transition: transform 0.25s ease;
+      z-index: 9999; white-space: nowrap;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="/" class="btn btn-neutral btn-sm" style="text-decoration:none">← Dashboard</a>
+  <h1>💰 TCO Calculator</h1>
+  <span style="font-size:12px; color:var(--muted)">Total Cost of Ownership — monthly per device</span>
+  <div style="margin-left:auto; display:flex; gap:8px;">
+    <button class="btn btn-ghost btn-sm" id="export-btn">⬇ Export CSV</button>
+    <button class="btn btn-primary btn-sm" id="add-btn">+ Add Device</button>
+  </div>
+</header>
+
+<div class="tco-wrap">
+
+  <!-- Summary cards -->
+  <div class="summary-bar" id="summary-bar" style="display:none">
+    <div class="summary-card">
+      <div class="sc-label">Devices</div>
+      <div class="sc-value" id="sum-devices">0</div>
+    </div>
+    <div class="summary-card">
+      <div class="sc-label">Mono volume / mo</div>
+      <div class="sc-value" id="sum-mono">0</div>
+    </div>
+    <div class="summary-card">
+      <div class="sc-label">Colour volume / mo</div>
+      <div class="sc-value" id="sum-colour">0</div>
+    </div>
+    <div class="summary-card">
+      <div class="sc-label">Click charges / mo</div>
+      <div class="sc-value" id="sum-clicks">R 0.00</div>
+    </div>
+    <div class="summary-card">
+      <div class="sc-label">Rental / mo</div>
+      <div class="sc-value" id="sum-rental">R 0.00</div>
+    </div>
+    <div class="summary-card highlight">
+      <div class="sc-label">Total TCO / mo</div>
+      <div class="sc-value" id="sum-tco">R 0.00</div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="tco-table-wrap">
+    <table id="tco-table">
+      <thead>
+        <tr>
+          <th class="col-num">#</th>
+          <th class="col-brand">Brand</th>
+          <th class="col-model">Model</th>
+          <th class="col-serial">Serial No</th>
+          <th class="col-vol" style="text-align:right">Mono Vol<br><span style="font-weight:400;text-transform:none;letter-spacing:0">(pages/mo)</span></th>
+          <th class="col-vol" style="text-align:right">Colour Vol<br><span style="font-weight:400;text-transform:none;letter-spacing:0">(pages/mo)</span></th>
+          <th class="col-rate" style="text-align:right">Mono Rate<br><span style="font-weight:400;text-transform:none;letter-spacing:0">(R/page)</span></th>
+          <th class="col-rate" style="text-align:right">Colour Rate<br><span style="font-weight:400;text-transform:none;letter-spacing:0">(R/page)</span></th>
+          <th class="col-rental" style="text-align:right">Rental<br><span style="font-weight:400;text-transform:none;letter-spacing:0">(R/mo)</span></th>
+          <th class="col-period">Period</th>
+          <th class="col-tco tco-col">Monthly TCO</th>
+          <th class="col-del"></th>
+        </tr>
+      </thead>
+      <tbody id="tco-body"></tbody>
+      <tfoot>
+        <tr id="totals-row" style="display:none">
+          <td colspan="10" class="totals-label">TOTAL</td>
+          <td class="totals-tco" id="total-tco">R 0.00</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <!-- Empty hint -->
+  <div id="empty-hint">
+    <div class="big">💰</div>
+    <p>No devices yet.<br>Click <strong>+ Add Device</strong> to start building your TCO model.</p>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── Catalogue ────────────────────────────────────────────────────────────────
+
+let catalogue = [];
+
+async function loadCatalogue() {
+  try {
+    const res = await fetch('/api/brands');
+    catalogue = await res.json();
+  } catch { catalogue = []; }
+}
+
+function brandOptions(selected = '') {
+  let html = '<option value="">— Brand —</option>';
+  catalogue.forEach(b => {
+    html += `<option value="${esc(b.name)}"${b.name === selected ? ' selected' : ''}>${esc(b.name)}</option>`;
+  });
+  return html;
+}
+
+function modelOptions(brandName, selected = '') {
+  const brand = catalogue.find(b => b.name === brandName);
+  if (!brand || !brand.models.length) return '<option value="">— Model —</option>';
+  let html = '<option value="">— Model —</option>';
+  brand.models.forEach(m => {
+    html += `<option value="${esc(m.name)}"${m.name === selected ? ' selected' : ''}>${esc(m.name)}</option>`;
+  });
+  return html;
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+}
+
+// ── Rows ─────────────────────────────────────────────────────────────────────
+
+let rows = [];
+let nextId = 1;
+
+function addRow(data = {}) {
+  const id = nextId++;
+  rows.push({ id, ...data });
+  renderRows();
+  // focus first empty field in the new row
+  const row = document.getElementById(`row-${id}`);
+  if (row) {
+    const first = row.querySelector('select, input');
+    if (first) first.focus();
+  }
+}
+
+function removeRow(id) {
+  rows = rows.filter(r => r.id !== id);
+  renderRows();
+}
+
+function getRowData(id) {
+  const el = document.getElementById(`row-${id}`);
+  if (!el) return null;
+  return {
+    brand:         el.querySelector('.r-brand').value,
+    model:         el.querySelector('.r-model').value,
+    serial:        el.querySelector('.r-serial').value.trim(),
+    mono_vol:      parseFloat(el.querySelector('.r-mono-vol').value)    || 0,
+    colour_vol:    parseFloat(el.querySelector('.r-colour-vol').value)  || 0,
+    mono_rate:     parseFloat(el.querySelector('.r-mono-rate').value)   || 0,
+    colour_rate:   parseFloat(el.querySelector('.r-colour-rate').value) || 0,
+    rental:        parseFloat(el.querySelector('.r-rental').value)      || 0,
+    period:        el.querySelector('.r-period').value,
+  };
+}
+
+function calcTco(d) {
+  return (d.mono_vol * d.mono_rate) + (d.colour_vol * d.colour_rate) + d.rental;
+}
+
+function fmt(n) {
+  return 'R ' + n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function renderRows() {
+  const tbody = document.getElementById('tco-body');
+
+  // Update row data from DOM before re-render (preserve edits)
+  rows.forEach(r => {
+    const d = getRowData(r.id);
+    if (d) Object.assign(r, d);
+  });
+
+  tbody.innerHTML = rows.map((r, i) => {
+    const tco = calcTco(r);
+    return `
+    <tr id="row-${r.id}">
+      <td class="col-num">${i + 1}</td>
+      <td class="col-brand">
+        <select class="tco-input r-brand" data-id="${r.id}">
+          ${brandOptions(r.brand)}
+        </select>
+      </td>
+      <td class="col-model">
+        <select class="tco-input r-model" data-id="${r.id}">
+          ${modelOptions(r.brand, r.model)}
+        </select>
+      </td>
+      <td class="col-serial">
+        <input class="tco-input r-serial" type="text" value="${esc(r.serial || '')}" placeholder="optional">
+      </td>
+      <td class="col-vol">
+        <input class="tco-input r-mono-vol" type="number" min="0" value="${r.mono_vol || ''}" placeholder="0" data-id="${r.id}">
+      </td>
+      <td class="col-vol">
+        <input class="tco-input r-colour-vol" type="number" min="0" value="${r.colour_vol || ''}" placeholder="0" data-id="${r.id}">
+      </td>
+      <td class="col-rate">
+        <input class="tco-input r-mono-rate" type="number" min="0" step="0.001" value="${r.mono_rate || ''}" placeholder="0.000" data-id="${r.id}">
+      </td>
+      <td class="col-rate">
+        <input class="tco-input r-colour-rate" type="number" min="0" step="0.001" value="${r.colour_rate || ''}" placeholder="0.000" data-id="${r.id}">
+      </td>
+      <td class="col-rental">
+        <input class="tco-input r-rental" type="number" min="0" step="0.01" value="${r.rental || ''}" placeholder="0.00" data-id="${r.id}">
+      </td>
+      <td class="col-period">
+        <select class="tco-input r-period" data-id="${r.id}">
+          <option value=""${!r.period ? ' selected' : ''}>No rental</option>
+          <option value="12"${r.period==='12' ? ' selected' : ''}>12 months</option>
+          <option value="24"${r.period==='24' ? ' selected' : ''}>24 months</option>
+          <option value="36"${r.period==='36' ? ' selected' : ''}>36 months</option>
+          <option value="72"${r.period==='72' ? ' selected' : ''}>72 months</option>
+          <option value="Evergreen"${r.period==='Evergreen' ? ' selected' : ''}>Evergreen</option>
+        </select>
+      </td>
+      <td class="col-tco tco-value" id="tco-${r.id}">${fmt(tco)}</td>
+      <td class="col-del">
+        <button class="del-btn" data-id="${r.id}" title="Remove">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  updateTotals();
+  updateEmptyState();
+  bindRowEvents();
+}
+
+function bindRowEvents() {
+  // Brand change → refresh model dropdown
+  document.querySelectorAll('.r-brand').forEach(sel => {
+    sel.addEventListener('change', e => {
+      const id = parseInt(e.target.dataset.id);
+      const row = rows.find(r => r.id === id);
+      if (row) { row.brand = e.target.value; row.model = ''; }
+      // Replace model select in same row
+      const tr = document.getElementById(`row-${id}`);
+      if (tr) tr.querySelector('.r-model').innerHTML = modelOptions(e.target.value, '');
+      recalcRow(id);
+    });
+  });
+
+  // Any numeric input change → recalc
+  document.querySelectorAll('.r-mono-vol,.r-colour-vol,.r-mono-rate,.r-colour-rate,.r-rental,.r-model,.r-period').forEach(el => {
+    el.addEventListener('input', e => {
+      const id = parseInt(e.target.dataset.id);
+      if (id) recalcRow(id);
+    });
+    el.addEventListener('change', e => {
+      const id = parseInt(e.target.dataset.id);
+      if (id) recalcRow(id);
+    });
+  });
+
+  // Delete buttons
+  document.querySelectorAll('.del-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      removeRow(parseInt(e.currentTarget.dataset.id));
+    });
+  });
+}
+
+function recalcRow(id) {
+  const d = getRowData(id);
+  if (!d) return;
+  const tco = calcTco(d);
+  const cell = document.getElementById(`tco-${id}`);
+  if (cell) cell.textContent = fmt(tco);
+  updateTotals();
+}
+
+function updateTotals() {
+  let totalTco = 0, totalMono = 0, totalColour = 0, totalClicks = 0, totalRental = 0;
+
+  rows.forEach(r => {
+    const d = getRowData(r.id) || r;
+    totalMono    += d.mono_vol   || 0;
+    totalColour  += d.colour_vol || 0;
+    totalClicks  += (d.mono_vol * d.mono_rate) + (d.colour_vol * d.colour_rate);
+    totalRental  += d.rental     || 0;
+    totalTco     += calcTco(d);
+  });
+
+  document.getElementById('total-tco').textContent   = fmt(totalTco);
+  document.getElementById('sum-devices').textContent  = rows.length;
+  document.getElementById('sum-mono').textContent     = totalMono.toLocaleString('en-ZA');
+  document.getElementById('sum-colour').textContent   = totalColour.toLocaleString('en-ZA');
+  document.getElementById('sum-clicks').textContent   = fmt(totalClicks);
+  document.getElementById('sum-rental').textContent   = fmt(totalRental);
+  document.getElementById('sum-tco').textContent      = fmt(totalTco);
+
+  document.getElementById('totals-row').style.display  = rows.length ? '' : 'none';
+  document.getElementById('summary-bar').style.display = rows.length ? 'flex' : 'none';
+}
+
+function updateEmptyState() {
+  document.getElementById('empty-hint').classList.toggle('hidden', rows.length > 0);
+}
+
+// ── Export CSV ────────────────────────────────────────────────────────────────
+
+document.getElementById('export-btn').addEventListener('click', () => {
+  if (!rows.length) { toast('Nothing to export'); return; }
+  const headers = ['#','Brand','Model','Serial No','Mono Vol','Colour Vol','Mono Rate','Colour Rate','Rental','Period','Monthly TCO'];
+  const csvRows = [headers.join(',')];
+  rows.forEach((r, i) => {
+    const d = getRowData(r.id) || r;
+    const tco = calcTco(d);
+    csvRows.push([
+      i + 1,
+      `"${(d.brand  || '').replace(/"/g,'""')}"`,
+      `"${(d.model  || '').replace(/"/g,'""')}"`,
+      `"${(d.serial || '').replace(/"/g,'""')}"`,
+      d.mono_vol, d.colour_vol,
+      d.mono_rate, d.colour_rate,
+      d.rental,
+      `"${d.period || 'No rental'}"`,
+      tco.toFixed(2),
+    ].join(','));
+  });
+
+  // Totals row
+  const allData = rows.map(r => getRowData(r.id) || r);
+  const grandTco = allData.reduce((s, d) => s + calcTco(d), 0);
+  csvRows.push(['TOTAL','','','','','','','','','',grandTco.toFixed(2)].join(','));
+
+  const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `tco-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  toast('CSV exported');
+});
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+document.getElementById('add-btn').addEventListener('click', () => addRow());
+
+loadCatalogue().then(() => {
+  updateEmptyState();
+});
+</script>
+</body>
+</html>

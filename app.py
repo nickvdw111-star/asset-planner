@@ -305,6 +305,10 @@ def dashboard():
 def planner():
     return send_from_directory('static', 'planner.html')
 
+@app.route('/tco')
+def tco_page():
+    return send_from_directory('static', 'tco.html')
+
 @app.route('/admin')
 def admin():
     return send_from_directory('static', 'admin.html')

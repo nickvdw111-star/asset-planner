@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Fleet Report — Asset Planner</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { min-height: 100vh; display: flex; flex-direction: column; background: var(--bg); }
+
+    header {
+      padding: 12px 20px; background: var(--surface); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+    }
+    header h1 { font-size: 17px; font-weight: 600; }
+
+    #client-bar {
+      padding: 10px 20px; background: var(--bg); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+    }
+    #client-bar label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+    #client-sel {
+      flex: 0 0 260px; background: var(--surface); border: 1px solid var(--border2);
+      border-radius: 6px; color: var(--text); font-size: 13px; padding: 7px 10px;
+      outline: none; cursor: pointer; font-family: inherit;
+    }
+    #client-sel:focus { border-color: var(--accent-h); }
+    #client-sel option { background: var(--surface2); }
+
+    /* ── Page body ── */
+    #report-body { flex: 1; padding: 24px 28px; display: none; }
+    #report-body.visible { display: block; }
+
+    /* ── Section headers ── */
+    .section-hd {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--muted); margin: 28px 0 12px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .section-hd::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    /* ── Summary strip ── */
+    .summary-strip { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+    .sum-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .sum-card .sc-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 6px; }
+    .sum-card .sc-val   { font-size: 22px; font-weight: 700; color: var(--text); line-height: 1; }
+    .sum-card .sc-sub   { font-size: 11px; color: var(--muted2); margin-top: 4px; }
+    .sum-card.accent .sc-val  { color: var(--accent-h); }
+    .sum-card.green  .sc-val  { color: #4ade80; }
+
+    /* ── Fleet composition row ── */
+    .composition-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .comp-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+      padding: 18px 20px;
+    }
+    .comp-card h3 { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 14px; }
+
+    /* Donut chart (CSS conic-gradient) */
+    .donut-wrap { display: flex; align-items: center; gap: 24px; }
+    .donut {
+      width: 90px; height: 90px; border-radius: 50%; flex-shrink: 0;
+      position: relative;
+    }
+    .donut-hole {
+      position: absolute; inset: 18px; background: var(--surface);
+      border-radius: 50%; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+    }
+    .donut-hole .pct  { font-size: 16px; font-weight: 700; color: var(--text); }
+    .donut-hole .lbl  { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .donut-legend { display: flex; flex-direction: column; gap: 8px; }
+    .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+    /* Category split bars */
+    .split-list { display: flex; flex-direction: column; gap: 10px; }
+    .split-row { display: flex; flex-direction: column; gap: 4px; }
+    .split-row-hd { display: flex; justify-content: space-between; font-size: 12px; }
+    .split-row-name { color: var(--text); font-weight: 500; }
+    .split-row-val  { color: var(--muted); }
+    .split-bar-track { height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+    .split-bar-fill  { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
+
+    /* ── Volume by location ── */
+    .location-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .location-table th {
+      text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--muted); padding: 8px 12px;
+      border-bottom: 2px solid var(--border2); white-space: nowrap;
+    }
+    .location-table th.r { text-align: right; }
+    .location-table td { padding: 7px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .location-table td.r { text-align: right; color: var(--muted); font-size: 12px; }
+    .location-table .city-row td { font-weight: 600; font-size: 13px; background: var(--surface); }
+    .location-table .bld-row td  { padding-left: 28px; }
+    .location-table .city-row td:first-child { border-left: 3px solid var(--accent-h); }
+    .location-table .bld-row td:first-child { border-left: 3px solid transparent; padding-left: 32px; }
+
+    /* Mini bar in table */
+    .vol-bar-wrap { display: flex; align-items: center; gap: 6px; min-width: 160px; }
+    .vol-bar-track { flex: 1; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; display: flex; }
+    .vol-bar-mono   { height: 100%; background: #3b82f6; }
+    .vol-bar-colour { height: 100%; background: #0d9488; }
+    .vol-bar-total  { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+    /* ── TCO by Category ── */
+    .cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+    .cat-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+      padding: 18px 20px; position: relative; overflow: hidden;
+    }
+    .cat-card::before {
+      content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+    }
+    .cat-card.printer::before { background: #3b82f6; }
+    .cat-card.mfp::before     { background: #8b5cf6; }
+    .cat-card.scanner::before { background: #f59e0b; }
+    .cat-card.server::before  { background: #6b7280; }
+
+    .cat-card-hd { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+    .cat-label { font-size: 15px; font-weight: 700; color: var(--text); }
+    .cat-sub   { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .cat-badge { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+
+    .cat-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+    .cat-stat .cst-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
+    .cat-stat .cst-val   { font-size: 15px; font-weight: 700; color: var(--text); }
+
+    .cat-tco-row { display: flex; justify-content: space-between; align-items: baseline;
+                   padding-top: 12px; border-top: 1px solid var(--border); }
+    .cat-tco-label { font-size: 11px; color: var(--muted); }
+    .cat-tco-val   { font-size: 18px; font-weight: 700; color: #4ade80; }
+
+    .cat-cost-split { display: flex; gap: 0; height: 6px; border-radius: 3px; overflow: hidden; margin-top: 8px; }
+    .cat-cost-click  { background: var(--accent-h); }
+    .cat-cost-rental { background: #7c3aed; }
+
+    .cat-cost-legend { display: flex; gap: 12px; margin-top: 6px; }
+    .cat-cost-legend span { font-size: 10px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+    .cat-cost-legend span::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 2px; }
+    .cat-cost-legend .lc::before { background: var(--accent-h); }
+    .cat-cost-legend .lr::before { background: #7c3aed; }
+
+    /* ── Top devices table ── */
+    .top-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .top-table th {
+      text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--muted); padding: 8px 12px;
+      border-bottom: 2px solid var(--border2); white-space: nowrap;
+    }
+    .top-table th.r { text-align: right; }
+    .top-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .top-table td.r { text-align: right; }
+    .top-table tr:hover td { background: var(--surface2); }
+    .rank-badge { display: inline-flex; align-items: center; justify-content: center;
+                  width: 22px; height: 22px; border-radius: 50%; font-size: 11px; font-weight: 700; }
+    .rank-badge.top1 { background: #f59e0b22; color: #f59e0b; }
+    .rank-badge.top2 { background: #9ca3af22; color: #9ca3af; }
+    .rank-badge.top3 { background: #b45309; color: #fde68a; }
+    .rank-badge.rest { background: var(--bg); color: var(--muted2); }
+    .dev-name { font-weight: 500; }
+    .dev-location { font-size: 11px; color: var(--muted2); }
+    .tco-pill { display: inline-block; background: rgba(74,222,128,0.12); color: #4ade80;
+                font-weight: 700; font-size: 13px; padding: 3px 10px; border-radius: 12px; }
+
+    /* Type & colour badges (reuse from admin) */
+    .badge-type { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 10px; white-space: nowrap; }
+    .badge-type.colour { background: rgba(59,130,246,0.2); color: #93c5fd; }
+    .badge-type.mono   { background: rgba(107,114,128,0.2); color: var(--muted); }
+    .badge-size { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 10px; white-space: nowrap; }
+    .badge-size.a3 { background: rgba(251,146,60,0.2); color: #fb923c; }
+    .badge-size.a4 { background: rgba(107,114,128,0.15); color: var(--muted); }
+
+    /* ── Empty / loading ── */
+    #empty-hint {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; color: var(--muted2); gap: 12px; text-align: center; padding: 60px;
+    }
+    #empty-hint .big { font-size: 56px; opacity: 0.3; }
+    #empty-hint p { font-size: 13px; line-height: 1.7; }
+    #empty-hint.hidden { display: none; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; bottom: 24px; left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--surface2); border: 1px solid var(--border2);
+      border-radius: 8px; padding: 10px 18px; font-size: 13px; color: var(--text);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4); transition: transform 0.25s ease;
+      z-index: 9999; white-space: nowrap;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+
+    @media print {
+      header, #client-bar { display: none; }
+      body { background: #fff; color: #111; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <a id="back-btn" href="/" class="btn btn-neutral btn-sm" style="text-decoration:none">← Dashboard</a>
+  <h1>📊 Fleet Report</h1>
+  <span style="font-size:12px; color:var(--muted)">Volume, cost and composition analysis</span>
+  <div style="margin-left:auto; display:flex; gap:8px;">
+    <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨 Print</button>
+  </div>
+</header>
+
+<div id="client-bar">
+  <label>Client</label>
+  <select id="client-sel"><option value="">— Select a client —</option></select>
+</div>
+
+<div id="report-body"></div>
+
+<div id="empty-hint">
+  <div class="big">📊</div>
+  <p>Select a client above to generate their fleet report.</p>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── Utilities ─────────────────────────────────────────────────────────────────
+
+const fmt  = (n, dec=2) => 'R ' + (n||0).toLocaleString('en-ZA', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+const fmtN = n => (n||0).toLocaleString('en-ZA');
+const pct  = (a, b) => b > 0 ? Math.round(a / b * 100) : 0;
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ── Clients ───────────────────────────────────────────────────────────────────
+
+async function loadClients() {
+  try {
+    const clients = await (await fetch('/api/clients')).json();
+    const sel = document.getElementById('client-sel');
+    clients.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.id; o.textContent = c.name;
+      sel.appendChild(o);
+    });
+  } catch {}
+}
+
+document.getElementById('client-sel').addEventListener('change', async e => {
+  const id = parseInt(e.target.value);
+  if (!id) { clearReport(); return; }
+  document.getElementById('back-btn').href = `/?client=${id}`;
+  await loadReport(id);
+});
+
+function clearReport() {
+  document.getElementById('report-body').classList.remove('visible');
+  document.getElementById('report-body').innerHTML = '';
+  document.getElementById('empty-hint').classList.remove('hidden');
+  document.getElementById('back-btn').href = '/';
+}
+
+// ── Report loader ─────────────────────────────────────────────────────────────
+
+async function loadReport(clientId) {
+  document.getElementById('empty-hint').classList.add('hidden');
+  document.getElementById('report-body').innerHTML = '<div style="padding:40px; color:var(--muted); font-size:13px;">Loading…</div>';
+  document.getElementById('report-body').classList.add('visible');
+  try {
+    const data = await (await fetch(`/api/clients/${clientId}/report`)).json();
+    renderReport(data);
+  } catch (err) {
+    document.getElementById('report-body').innerHTML = `<div style="padding:40px; color:var(--danger-t)">Could not load report: ${esc(err.message)}</div>`;
+  }
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+
+function renderReport(d) {
+  const s = d.summary;
+  const totalVol  = s.mono_vol + s.colour_vol;
+  const colourPct = pct(s.colour_vol, totalVol);
+  const monoPct   = 100 - colourPct;
+
+  let html = '';
+
+  // ── 1. Summary strip ──
+  html += `<div class="section-hd">Fleet Summary</div>
+  <div class="summary-strip">
+    <div class="sum-card">
+      <div class="sc-label">Total Devices</div>
+      <div class="sc-val">${s.devices}</div>
+      <div class="sc-sub">${d.cities.length} cit${d.cities.length===1?'y':'ies'} · ${d.cities.reduce((a,c)=>a+c.buildings.length,0)} buildings</div>
+    </div>
+    <div class="sum-card accent">
+      <div class="sc-label">Mono Volume / mo</div>
+      <div class="sc-val">${fmtN(s.mono_vol)}</div>
+      <div class="sc-sub">${monoPct}% of total pages</div>
+    </div>
+    <div class="sum-card" style="--accent-h:#0d9488">
+      <div class="sc-label">Colour Volume / mo</div>
+      <div class="sc-val" style="color:#0d9488">${fmtN(s.colour_vol)}</div>
+      <div class="sc-sub">${colourPct}% of total pages</div>
+    </div>
+    <div class="sum-card">
+      <div class="sc-label">Click Charges / mo</div>
+      <div class="sc-val" style="color:#f59e0b">${fmt(s.click_charges)}</div>
+      <div class="sc-sub">Variable cost</div>
+    </div>
+    <div class="sum-card">
+      <div class="sc-label">Rental / mo</div>
+      <div class="sc-val" style="color:#8b5cf6">${fmt(s.rental)}</div>
+      <div class="sc-sub">Fixed cost · ${s.tco > 0 ? pct(s.rental, s.tco) : 0}% of TCO</div>
+    </div>
+    <div class="sum-card green">
+      <div class="sc-label">Total TCO / mo</div>
+      <div class="sc-val">${fmt(s.tco)}</div>
+      <div class="sc-sub">R ${s.devices > 0 ? (s.tco / s.devices).toLocaleString('en-ZA',{maximumFractionDigits:0}) : 0} per device avg</div>
+    </div>
+  </div>`;
+
+  // ── 2. Fleet composition ──
+  html += `<div class="section-hd">Fleet Composition</div>
+  <div class="composition-row">`;
+
+  // Volume split donut
+  const cDeg = Math.round(colourPct * 3.6);
+  html += `<div class="comp-card">
+    <h3>Print Volume Mix</h3>
+    <div class="donut-wrap">
+      <div class="donut" style="background: conic-gradient(#3b82f6 0deg ${360-cDeg}deg, #0d9488 ${360-cDeg}deg 360deg)">
+        <div class="donut-hole">
+          <span class="pct">${fmtN(totalVol)}</span>
+          <span class="lbl">pages/mo</span>
+        </div>
+      </div>
+      <div class="donut-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div><span><b>${monoPct}%</b> Mono — ${fmtN(s.mono_vol)} pages</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#0d9488"></div><span><b>${colourPct}%</b> Colour — ${fmtN(s.colour_vol)} pages</span></div>
+      </div>
+    </div>
+  </div>`;
+
+  // Device category split
+  const devTotal = s.devices;
+  const catColours = { printer: '#3b82f6', mfp: '#8b5cf6', scanner: '#f59e0b', server: '#6b7280' };
+  html += `<div class="comp-card"><h3>Device Categories</h3><div class="split-list">`;
+  d.categories.forEach(cat => {
+    const w = pct(cat.devices, devTotal);
+    const col = catColours[cat.device_type] || '#6b7280';
+    html += `<div class="split-row">
+      <div class="split-row-hd">
+        <span class="split-row-name">${esc(cat.label)}</span>
+        <span class="split-row-val">${cat.devices} device${cat.devices!==1?'s':''} · ${fmt(cat.tco)}/mo</span>
+      </div>
+      <div class="split-bar-track">
+        <div class="split-bar-fill" style="width:${w}%; background:${col}"></div>
+      </div>
+    </div>`;
+  });
+  html += `</div></div></div>`;
+
+  // ── 3. Volume by location ──
+  if (d.cities.length) {
+    const maxVol = Math.max(...d.cities.flatMap(c => c.buildings.map(b => b.mono_vol + b.colour_vol)), 1);
+    html += `<div class="section-hd">Volume by Location</div>
+    <table class="location-table">
+      <thead>
+        <tr>
+          <th>City / Building</th>
+          <th class="r">Devices</th>
+          <th>Volume breakdown</th>
+          <th class="r">Mono</th>
+          <th class="r">Colour</th>
+          <th class="r">Click charges</th>
+          <th class="r">Rental</th>
+          <th class="r">Monthly TCO</th>
+        </tr>
+      </thead>
+      <tbody>`;
+    d.cities.forEach(city => {
+      const cityVol = city.mono_vol + city.colour_vol;
+      const mw = cityVol > 0 ? pct(city.mono_vol, maxVol) : 0;
+      const cw = cityVol > 0 ? pct(city.colour_vol, maxVol) : 0;
+      html += `<tr class="city-row">
+        <td>🌆 ${esc(city.name)}</td>
+        <td class="r">${city.devices}</td>
+        <td><div class="vol-bar-wrap">
+          <div class="vol-bar-track"><div class="vol-bar-mono" style="width:${mw}%"></div><div class="vol-bar-colour" style="width:${cw}%"></div></div>
+          <span class="vol-bar-total">${fmtN(cityVol)}</span>
+        </div></td>
+        <td class="r">${fmtN(city.mono_vol)}</td>
+        <td class="r">${fmtN(city.colour_vol)}</td>
+        <td class="r">${fmt(city.click_charges)}</td>
+        <td class="r">${fmt(city.rental)}</td>
+        <td class="r" style="font-weight:600; color:var(--text)">${fmt(city.tco)}</td>
+      </tr>`;
+      city.buildings.forEach(bld => {
+        const bVol = bld.mono_vol + bld.colour_vol;
+        const bmw  = bVol > 0 ? pct(bld.mono_vol, maxVol) : 0;
+        const bcw  = bVol > 0 ? pct(bld.colour_vol, maxVol) : 0;
+        html += `<tr class="bld-row">
+          <td>🏗 ${esc(bld.name)}</td>
+          <td class="r">${bld.devices}</td>
+          <td><div class="vol-bar-wrap">
+            <div class="vol-bar-track"><div class="vol-bar-mono" style="width:${bmw}%"></div><div class="vol-bar-colour" style="width:${bcw}%"></div></div>
+            <span class="vol-bar-total">${fmtN(bVol)}</span>
+          </div></td>
+          <td class="r">${fmtN(bld.mono_vol)}</td>
+          <td class="r">${fmtN(bld.colour_vol)}</td>
+          <td class="r">${fmt(bld.click_charges)}</td>
+          <td class="r">${fmt(bld.rental)}</td>
+          <td class="r">${fmt(bld.tco)}</td>
+        </tr>`;
+      });
+    });
+    html += `</tbody></table>`;
+  }
+
+  // ── 4. TCO by device category ──
+  if (d.categories.length) {
+    html += `<div class="section-hd">TCO by Device Category</div><div class="cat-grid">`;
+    d.categories.forEach(cat => {
+      const typeIcon = { printer:'🖨', mfp:'🗄', scanner:'📠', server:'🖥' }[cat.device_type] || '🖨';
+      const clickPct = cat.tco > 0 ? pct(cat.click_charges, cat.tco) : 0;
+      const rentPct  = cat.tco > 0 ? pct(cat.rental, cat.tco) : 0;
+      const cppMono   = cat.mono_vol   > 0 ? (cat.click_charges / (cat.mono_vol + cat.colour_vol)) : 0;
+      html += `<div class="cat-card ${esc(cat.device_type)}">
+        <div class="cat-card-hd">
+          <div>
+            <div class="cat-label">${typeIcon} ${esc(cat.label)}</div>
+            <div class="cat-sub">${cat.mono_count} mono · ${cat.colour_count} colour</div>
+          </div>
+          <div class="cat-badge">
+            <span class="badge-size ${cat.page_size.toLowerCase()}">${esc(cat.page_size)}</span>
+          </div>
+        </div>
+        <div class="cat-stats">
+          <div class="cat-stat">
+            <div class="cst-label">Devices</div>
+            <div class="cst-val">${cat.devices}</div>
+          </div>
+          <div class="cat-stat">
+            <div class="cst-label">Avg CPP</div>
+            <div class="cst-val" style="font-size:13px">R ${cppMono > 0 ? cppMono.toFixed(4) : '—'}</div>
+          </div>
+          <div class="cat-stat">
+            <div class="cst-label">Mono vol</div>
+            <div class="cst-val" style="color:var(--accent-h)">${fmtN(cat.mono_vol)}</div>
+          </div>
+          <div class="cat-stat">
+            <div class="cst-label">Colour vol</div>
+            <div class="cst-val" style="color:#0d9488">${fmtN(cat.colour_vol)}</div>
+          </div>
+        </div>
+        <div class="cat-cost-split">
+          <div class="cat-cost-click"  style="width:${clickPct}%"></div>
+          <div class="cat-cost-rental" style="width:${rentPct}%"></div>
+        </div>
+        <div class="cat-cost-legend">
+          <span class="lc">Clicks ${fmt(cat.click_charges)}</span>
+          <span class="lr">Rental ${fmt(cat.rental)}</span>
+        </div>
+        <div class="cat-tco-row">
+          <span class="cat-tco-label">Monthly TCO</span>
+          <span class="cat-tco-val">${fmt(cat.tco)}</span>
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // ── 5. Top 10 devices ──
+  if (d.top_devices.length) {
+    html += `<div class="section-hd">Top ${d.top_devices.length} Devices by Monthly TCO</div>
+    <table class="top-table">
+      <thead>
+        <tr>
+          <th style="width:36px">#</th>
+          <th>Device</th>
+          <th>Category</th>
+          <th class="r">Mono vol</th>
+          <th class="r">Colour vol</th>
+          <th class="r">Monthly TCO</th>
+        </tr>
+      </thead>
+      <tbody>`;
+    d.top_devices.forEach((dev, i) => {
+      const rankClass = i===0?'top1':i===1?'top2':i===2?'top3':'rest';
+      const ctClass   = dev.colour_type === 'colour' ? 'colour' : 'mono';
+      html += `<tr>
+        <td><span class="rank-badge ${rankClass}">${i+1}</span></td>
+        <td>
+          <div class="dev-name">${esc(dev.label)}</div>
+          <div class="dev-location">📍 ${esc(dev.city)} · ${esc(dev.building)} · ${esc(dev.floor)}</div>
+          ${dev.brand||dev.model ? `<div class="dev-location" style="color:var(--muted)">${esc([dev.brand,dev.model].filter(Boolean).join(' '))}</div>` : ''}
+        </td>
+        <td>
+          <span class="badge-type ${ctClass}">${ctClass==='colour'?'Colour':'Mono'}</span>
+          <span style="font-size:12px; color:var(--muted); margin-left:4px">${esc(dev.category)}</span>
+        </td>
+        <td class="r">${fmtN(dev.mono_vol)}</td>
+        <td class="r">${fmtN(dev.colour_vol)}</td>
+        <td class="r"><span class="tco-pill">${fmt(dev.tco)}</span></td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+  }
+
+  // ── No data ──
+  if (!s.devices) {
+    html += `<div style="padding:40px; text-align:center; color:var(--muted2); font-size:13px;">
+      No devices found for this client. Add devices via the floor planner to generate a report.
+    </div>`;
+  }
+
+  html += '<div style="height:40px"></div>';
+  document.getElementById('report-body').innerHTML = html;
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+const urlParams   = new URLSearchParams(location.search);
+const urlClientId = parseInt(urlParams.get('client'));
+if (urlClientId) document.getElementById('back-btn').href = `/?client=${urlClientId}`;
+
+loadClients().then(() => {
+  if (urlClientId) {
+    document.getElementById('client-sel').value = urlClientId;
+    loadReport(urlClientId);
+  }
+});
+
+async function loadClients() {
+  try {
+    const clients = await (await fetch('/api/clients')).json();
+    const sel = document.getElementById('client-sel');
+    clients.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.id; o.textContent = c.name;
+      sel.appendChild(o);
+    });
+  } catch {}
+}
+</script>
+</body>
+</html>

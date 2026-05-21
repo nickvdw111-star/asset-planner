@@ -319,6 +319,10 @@ def planner():
 def tco_page():
     return send_from_directory('static', 'tco.html')
 
+@app.route('/reports')
+def reports_page():
+    return send_from_directory('static', 'reports.html')
+
 @app.route('/admin')
 def admin():
     return send_from_directory('static', 'admin.html')
@@ -433,6 +437,126 @@ def update_client(cid):
         db.execute('UPDATE clients SET name=? WHERE id=?', (name, cid))
         row = db.execute('SELECT * FROM clients WHERE id=?', (cid,)).fetchone()
     return jsonify(dict(row))
+
+@app.route('/api/clients/<int:cid>/report', methods=['GET'])
+def client_report(cid):
+    with get_db() as db:
+        client = db.execute('SELECT * FROM clients WHERE id=?', (cid,)).fetchone()
+        if not client:
+            abort(404)
+        rows = db.execute('''
+            SELECT d.id, d.label, d.type, d.brand, d.model, d.serial,
+                   d.avg_mono, d.avg_colour, d.mono_rate, d.colour_rate,
+                   d.rental_amount,
+                   COALESCE(m.colour_type, 'mono') AS colour_type,
+                   COALESCE(m.page_size,   'A4')   AS page_size,
+                   b.name  AS building_name, b.id AS building_id,
+                   f.label AS floor_label,
+                   ci.name AS city_name,   ci.id AS city_id
+            FROM devices d
+            LEFT JOIN brands br ON br.name = d.brand
+            LEFT JOIN models m  ON m.brand_id = br.id AND m.name = d.model
+            JOIN floors    f  ON f.id  = d.floor_id
+            JOIN buildings b  ON b.id  = f.building_id
+            JOIN cities    ci ON ci.id = b.city_id
+            WHERE ci.client_id = ?
+            ORDER BY ci.name, b.name, f.level, d.label
+        ''', (cid,)).fetchall()
+        devices = [dict(r) for r in rows]
+
+    def _tco(d):
+        return ((d['avg_mono']    or 0) * (d['mono_rate']   or 0) +
+                (d['avg_colour']  or 0) * (d['colour_rate'] or 0) +
+                (d['rental_amount'] or 0))
+
+    def _clicks(d):
+        return ((d['avg_mono']   or 0) * (d['mono_rate']   or 0) +
+                (d['avg_colour'] or 0) * (d['colour_rate'] or 0))
+
+    # ── Summary ──
+    summary = {
+        'devices':       len(devices),
+        'mono_vol':      sum(d['avg_mono']       or 0 for d in devices),
+        'colour_vol':    sum(d['avg_colour']      or 0 for d in devices),
+        'click_charges': sum(_clicks(d)               for d in devices),
+        'rental':        sum(d['rental_amount']   or 0 for d in devices),
+        'tco':           sum(_tco(d)                  for d in devices),
+    }
+
+    # ── By city / building ──
+    from collections import OrderedDict
+    cities_map = OrderedDict()
+    for d in devices:
+        cn, bn = d['city_name'], d['building_name']
+        if cn not in cities_map:
+            cities_map[cn] = dict(name=cn, devices=0, mono_vol=0, colour_vol=0,
+                                  click_charges=0, rental=0, tco=0, buildings=OrderedDict())
+        city = cities_map[cn]
+        city['devices']       += 1
+        city['mono_vol']      += d['avg_mono']      or 0
+        city['colour_vol']    += d['avg_colour']    or 0
+        city['click_charges'] += _clicks(d)
+        city['rental']        += d['rental_amount'] or 0
+        city['tco']           += _tco(d)
+        if bn not in city['buildings']:
+            city['buildings'][bn] = dict(name=bn, devices=0, mono_vol=0, colour_vol=0,
+                                         click_charges=0, rental=0, tco=0)
+        bld = city['buildings'][bn]
+        bld['devices']       += 1
+        bld['mono_vol']      += d['avg_mono']      or 0
+        bld['colour_vol']    += d['avg_colour']    or 0
+        bld['click_charges'] += _clicks(d)
+        bld['rental']        += d['rental_amount'] or 0
+        bld['tco']           += _tco(d)
+
+    cities = []
+    for city in cities_map.values():
+        c = dict(city)
+        c['buildings'] = list(city['buildings'].values())
+        cities.append(c)
+
+    # ── By category (page_size × device_type) ──
+    cat_map = {}
+    for d in devices:
+        ps = d['page_size'] or 'A4'
+        dt = d['type']      or 'printer'
+        ct = d['colour_type'] or 'mono'
+        key = (ps, dt)
+        if key not in cat_map:
+            cat_map[key] = dict(page_size=ps, device_type=dt,
+                                label=f'{ps} {dt.upper()}',
+                                devices=0, mono_count=0, colour_count=0,
+                                mono_vol=0, colour_vol=0,
+                                click_charges=0, rental=0, tco=0)
+        cat = cat_map[key]
+        cat['devices']       += 1
+        cat['mono_count']    += (1 if ct == 'mono'   else 0)
+        cat['colour_count']  += (1 if ct == 'colour' else 0)
+        cat['mono_vol']      += d['avg_mono']      or 0
+        cat['colour_vol']    += d['avg_colour']    or 0
+        cat['click_charges'] += _clicks(d)
+        cat['rental']        += d['rental_amount'] or 0
+        cat['tco']           += _tco(d)
+
+    type_order = {'printer': 0, 'mfp': 1, 'scanner': 2, 'server': 3}
+    categories = sorted(cat_map.values(),
+                        key=lambda c: ({'A4':0,'A3':1}.get(c['page_size'],9),
+                                       type_order.get(c['device_type'],9)))
+
+    # ── Top 10 by TCO ──
+    top = sorted(
+        [dict(label=d['label'] or 'Unnamed', brand=d['brand'], model=d['model'],
+              building=d['building_name'], city=d['city_name'], floor=d['floor_label'],
+              category=f"{d['page_size']} {(d['type'] or 'printer').upper()}",
+              colour_type=d['colour_type'],
+              mono_vol=d['avg_mono'] or 0, colour_vol=d['avg_colour'] or 0,
+              tco=round(_tco(d), 2)) for d in devices],
+        key=lambda x: x['tco'], reverse=True
+    )[:10]
+
+    return jsonify(dict(client_name=client['name'],
+                        summary=summary, cities=cities,
+                        categories=categories, top_devices=top))
 
 @app.route('/api/clients/<int:cid>/devices', methods=['GET'])
 def list_client_devices(cid):

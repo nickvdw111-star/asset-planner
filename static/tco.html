@@ -44,6 +44,10 @@
     #client-sel:focus { border-color: var(--accent-h); }
     #client-sel option { background: var(--surface2); }
     #load-status { font-size: 12px; color: var(--muted); }
+    #sync-status { font-size: 12px; margin-left: auto; }
+    #sync-status.saving { color: var(--accent-h); }
+    #sync-status.saved  { color: #4ade80; }
+    #sync-status.error  { color: var(--danger-t); }
 
     .tco-wrap {
       flex: 1;
@@ -200,6 +204,7 @@
     <option value="">— Select a client —</option>
   </select>
   <span id="load-status"></span>
+  <span id="sync-status"></span>
 </div>
 
 <div class="tco-wrap">
@@ -334,7 +339,9 @@ async function loadClientDevices(clientId) {
     const devices = await (await fetch(`/api/clients/${clientId}/devices`)).json();
     rows = devices.map(d => ({
       id:          nextId++,
-      device_name: d.label || '',
+      device_id:   d.id,           // UUID — used to sync back to the API
+      _orig:       d,              // preserve type/notes/coords for PUT payload
+      device_name: d.label        || '',
       location:    `${d.building_name} · ${d.floor_label}`,
       brand:       d.brand        || '',
       model:       d.model        || '',
@@ -479,6 +486,15 @@ function bindRowEvents() {
     el.addEventListener('change', e => { const id = parseInt(e.target.dataset.id); if (id) recalcRow(id); });
   });
 
+  // Non-numeric fields — sync only, no recalc needed
+  document.querySelectorAll('.r-device,.r-serial').forEach(el => {
+    el.addEventListener('input', e => {
+      const tr  = e.target.closest('tr');
+      const id  = tr ? parseInt(tr.id.replace('row-', '')) : null;
+      if (id) scheduleSyncRow(id);
+    });
+  });
+
   document.querySelectorAll('.del-btn').forEach(btn => {
     btn.addEventListener('click', e => removeRow(parseInt(e.currentTarget.dataset.id)));
   });
@@ -494,6 +510,61 @@ function recalcRow(id) {
     cell.className = tco === 0 ? 'tco-value zero' : 'tco-value';
   }
   updateTotals();
+  scheduleSyncRow(id);
+}
+
+// ── Sync to database ──────────────────────────────────────────────────────────
+
+const syncTimers = {};
+
+function scheduleSyncRow(rowId) {
+  const row = rows.find(r => r.id === rowId);
+  if (!row?.device_id) return; // manual row — nothing to sync
+  clearTimeout(syncTimers[rowId]);
+  syncTimers[rowId] = setTimeout(() => syncRow(rowId), 600);
+}
+
+function setSyncStatus(state, msg) {
+  const el = document.getElementById('sync-status');
+  el.textContent = msg;
+  el.className   = state;
+}
+
+async function syncRow(rowId) {
+  const row = rows.find(r => r.id === rowId);
+  if (!row?.device_id) return;
+  const d = getRowData(rowId);
+  if (!d) return;
+
+  setSyncStatus('saving', '↑ Saving…');
+  try {
+    const res = await fetch(`/api/devices/${row.device_id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type:           row._orig.type,
+        label:          d.device_name || row._orig.label,
+        brand:          d.brand,
+        model:          d.model,
+        serial:         d.serial,
+        notes:          row._orig.notes,
+        avg_mono:       d.mono_vol    || 0,
+        avg_colour:     d.colour_vol  || 0,
+        mono_rate:      d.mono_rate   || null,
+        colour_rate:    d.colour_rate || null,
+        rental_amount:  d.rental      || null,
+        rental_period:  d.period      || null,
+        x_pct:          row._orig.x_pct,
+        y_pct:          row._orig.y_pct,
+      }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    setSyncStatus('saved', '✓ Saved');
+    setTimeout(() => setSyncStatus('', ''), 2000);
+  } catch (err) {
+    setSyncStatus('error', '✗ Save failed');
+    console.error('TCO sync error:', err);
+  }
 }
 
 function updateTotals() {

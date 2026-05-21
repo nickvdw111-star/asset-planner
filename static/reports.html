@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Fleet Report — Asset Planner</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     body { min-height: 100vh; display: flex; flex-direction: column; background: var(--bg); }
 
@@ -207,6 +208,7 @@
   <h1>📊 Fleet Report</h1>
   <span style="font-size:12px; color:var(--muted)">Volume, cost and composition analysis</span>
   <div style="margin-left:auto; display:flex; gap:8px;">
+    <button class="btn btn-ghost btn-sm" id="pdf-btn">📄 Export PDF</button>
     <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨 Print</button>
   </div>
 </header>
@@ -243,18 +245,6 @@ function toast(msg) {
 }
 
 // ── Clients ───────────────────────────────────────────────────────────────────
-
-async function loadClients() {
-  try {
-    const clients = await (await fetch('/api/clients')).json();
-    const sel = document.getElementById('client-sel');
-    clients.forEach(c => {
-      const o = document.createElement('option');
-      o.value = c.id; o.textContent = c.name;
-      sel.appendChild(o);
-    });
-  } catch {}
-}
 
 document.getElementById('client-sel').addEventListener('change', async e => {
   const id = parseInt(e.target.value);
@@ -528,6 +518,23 @@ function renderReport(d) {
   document.getElementById('report-body').innerHTML = html;
 }
 
+// ── PDF export ────────────────────────────────────────────────────────────────
+
+document.getElementById('pdf-btn').addEventListener('click', () => {
+  const body = document.getElementById('report-body');
+  if (!body.classList.contains('visible')) { toast('Select a client first'); return; }
+  const clientName = document.getElementById('client-sel').selectedOptions[0]?.text || 'fleet';
+  const filename = clientName.replace(/[^a-z0-9]/gi, '-').toLowerCase() + '-fleet-report.pdf';
+  toast('Generating PDF…');
+  html2pdf().set({
+    margin: [8, 8, 8, 8],
+    filename,
+    image:      { type: 'jpeg', quality: 0.97 },
+    html2canvas:{ scale: 2, useCORS: true },
+    jsPDF:      { unit: 'mm', format: 'a4', orientation: 'landscape' },
+  }).from(body).save().then(() => toast('PDF downloaded'));
+});
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 const urlParams   = new URLSearchParams(location.search);
@@ -540,18 +547,6 @@ loadClients().then(() => {
     loadReport(urlClientId);
   }
 });
-
-async function loadClients() {
-  try {
-    const clients = await (await fetch('/api/clients')).json();
-    const sel = document.getElementById('client-sel');
-    clients.forEach(c => {
-      const o = document.createElement('option');
-      o.value = c.id; o.textContent = c.name;
-      sel.appendChild(o);
-    });
-  } catch {}
-}
 </script>
 </body>
 </html>

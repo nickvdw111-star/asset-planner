@@ -76,6 +76,16 @@ def init_db():
             );
         ''')
         # Migrate existing databases
+        mcols = [r[1] for r in db.execute('PRAGMA table_info(models)').fetchall()]
+        if 'colour_type' not in mcols:
+            db.execute("ALTER TABLE models ADD COLUMN colour_type TEXT DEFAULT 'mono'")
+        if 'page_size' not in mcols:
+            db.execute("ALTER TABLE models ADD COLUMN page_size TEXT DEFAULT 'A4'")
+        if 'mono_rate' not in mcols:
+            db.execute('ALTER TABLE models ADD COLUMN mono_rate REAL')
+        if 'colour_rate' not in mcols:
+            db.execute('ALTER TABLE models ADD COLUMN colour_rate REAL')
+
         cols = [r[1] for r in db.execute('PRAGMA table_info(devices)').fetchall()]
         if 'avg_mono' not in cols:
             db.execute('ALTER TABLE devices ADD COLUMN avg_mono INTEGER NOT NULL DEFAULT 0')
@@ -355,13 +365,39 @@ def list_models(brand_id):
 
 @app.route('/api/brands/<int:brand_id>/models', methods=['POST'])
 def create_model(brand_id):
-    name = (request.json or {}).get('name', '').strip()
+    d = request.json or {}
+    name = d.get('name', '').strip()
     if not name:
         return jsonify({'error': 'name required'}), 400
+    colour_type = d.get('colour_type', 'mono')
+    page_size   = d.get('page_size', 'A4')
+    mono_rate   = d.get('mono_rate') or None
+    colour_rate = d.get('colour_rate') or None
     with get_db() as db:
-        cur = db.execute('INSERT INTO models (brand_id, name) VALUES (?, ?)', (brand_id, name))
+        cur = db.execute(
+            'INSERT INTO models (brand_id, name, colour_type, page_size, mono_rate, colour_rate) VALUES (?,?,?,?,?,?)',
+            (brand_id, name, colour_type, page_size, mono_rate, colour_rate)
+        )
         row = db.execute('SELECT * FROM models WHERE id = ?', (cur.lastrowid,)).fetchone()
     return jsonify(dict(row)), 201
+
+@app.route('/api/models/<int:model_id>', methods=['PUT'])
+def update_model(model_id):
+    d = request.json or {}
+    name = d.get('name', '').strip()
+    if not name:
+        return jsonify({'error': 'name required'}), 400
+    colour_type = d.get('colour_type', 'mono')
+    page_size   = d.get('page_size', 'A4')
+    mono_rate   = d.get('mono_rate') or None
+    colour_rate = d.get('colour_rate') or None
+    with get_db() as db:
+        db.execute(
+            'UPDATE models SET name=?, colour_type=?, page_size=?, mono_rate=?, colour_rate=? WHERE id=?',
+            (name, colour_type, page_size, mono_rate, colour_rate, model_id)
+        )
+        row = db.execute('SELECT * FROM models WHERE id = ?', (model_id,)).fetchone()
+    return jsonify(dict(row))
 
 @app.route('/api/models/<int:model_id>', methods=['DELETE'])
 def delete_model(model_id):

@@ -822,6 +822,15 @@ modalBrand.addEventListener('change', () => {
   document.getElementById('model-add-row').classList.remove('open');
 });
 
+modalModel.addEventListener('change', () => {
+  const brand = catalogue.find(b => b.name === modalBrand.value);
+  const model = brand?.models.find(m => m.name === modalModel.value);
+  if (model) {
+    if (model.mono_rate   != null) document.getElementById('modal-mono-rate').value   = model.mono_rate;
+    if (model.colour_rate != null) document.getElementById('modal-colour-rate').value = model.colour_rate;
+  }
+});
+
 // ── Inline add brand ──────────────────────────────────────────────────────────
 
 const brandAddRow    = document.getElementById('brand-add-row');

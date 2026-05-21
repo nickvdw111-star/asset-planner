@@ -1143,6 +1143,16 @@ document.getElementById('dm-brand').addEventListener('change', e => {
   document.getElementById('dm-model-add-row').classList.remove('open');
 });
 
+document.getElementById('dm-model').addEventListener('change', e => {
+  const brandName = document.getElementById('dm-brand').value;
+  const brand = deviceCatalogue.find(b => b.name === brandName);
+  const model = brand?.models.find(m => m.name === e.target.value);
+  if (model) {
+    if (model.mono_rate   != null) document.getElementById('dm-mono-rate').value   = model.mono_rate;
+    if (model.colour_rate != null) document.getElementById('dm-colour-rate').value = model.colour_rate;
+  }
+});
+
 // ── Device modal ──────────────────────────────────────────────────────────────
 
 let dmTarget = null; // { device, floorId, container }

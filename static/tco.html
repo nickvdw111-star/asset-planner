@@ -481,6 +481,20 @@ function bindRowEvents() {
     });
   });
 
+  document.querySelectorAll('.r-model').forEach(sel => {
+    sel.addEventListener('change', e => {
+      const id    = parseInt(e.target.dataset.id);
+      const tr    = document.getElementById(`row-${id}`);
+      const brand = catalogue.find(b => b.name === tr?.querySelector('.r-brand').value);
+      const model = brand?.models.find(m => m.name === e.target.value);
+      if (model) {
+        if (model.mono_rate   != null) tr.querySelector('.r-mono-rate').value   = model.mono_rate;
+        if (model.colour_rate != null) tr.querySelector('.r-colour-rate').value = model.colour_rate;
+      }
+      recalcRow(id);
+    });
+  });
+
   document.querySelectorAll('.r-mono-vol,.r-colour-vol,.r-mono-rate,.r-colour-rate,.r-rental,.r-model,.r-period').forEach(el => {
     el.addEventListener('input',  e => { const id = parseInt(e.target.dataset.id); if (id) recalcRow(id); });
     el.addEventListener('change', e => { const id = parseInt(e.target.dataset.id); if (id) recalcRow(id); });

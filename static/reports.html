@@ -246,9 +246,22 @@ function toast(msg) {
 
 // ── Clients ───────────────────────────────────────────────────────────────────
 
+async function loadClients() {
+  try {
+    const clients = await (await fetch('/api/clients')).json();
+    const sel = document.getElementById('client-sel');
+    clients.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.id; o.textContent = c.name;
+      sel.appendChild(o);
+    });
+  } catch {}
+}
+
 document.getElementById('client-sel').addEventListener('change', async e => {
   const id = parseInt(e.target.value);
-  if (!id) { clearReport(); return; }
+  if (!id) { clearReport(); sessionStorage.removeItem('reportClientId'); return; }
+  sessionStorage.setItem('reportClientId', id);
   document.getElementById('back-btn').href = `/?client=${id}`;
   await loadReport(id);
 });
@@ -538,13 +551,16 @@ document.getElementById('pdf-btn').addEventListener('click', () => {
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 const urlParams   = new URLSearchParams(location.search);
-const urlClientId = parseInt(urlParams.get('client'));
+const urlClientId = parseInt(urlParams.get('client')) || parseInt(sessionStorage.getItem('reportClientId'));
 if (urlClientId) document.getElementById('back-btn').href = `/?client=${urlClientId}`;
 
 loadClients().then(() => {
   if (urlClientId) {
     document.getElementById('client-sel').value = urlClientId;
-    loadReport(urlClientId);
+    if (document.getElementById('client-sel').value == urlClientId) {
+      sessionStorage.setItem('reportClientId', urlClientId);
+      loadReport(urlClientId);
+    }
   }
 });
 </script>

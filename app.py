@@ -109,6 +109,13 @@ def init_db():
         flcols = [r[1] for r in db.execute('PRAGMA table_info(floors)').fetchall()]
         if 'level' not in flcols:
             db.execute('ALTER TABLE floors ADD COLUMN level INTEGER NOT NULL DEFAULT 0')
+
+        # Add unique constraint on models(brand_id, name) if not already present
+        # SQLite doesn't support ADD CONSTRAINT, so we check via index
+        existing_indexes = [r[1] for r in db.execute("PRAGMA index_list('models')").fetchall()]
+        if 'uq_models_brand_name' not in existing_indexes:
+            db.execute('CREATE UNIQUE INDEX IF NOT EXISTS uq_models_brand_name ON models(brand_id, name)')
+
         # Seed brands and models — safe to run every startup (INSERT OR IGNORE / WHERE NOT EXISTS)
         SEED = {
             'Brother': [
@@ -1005,9 +1012,13 @@ def import_devices():
                 floor_id = cur.lastrowid
                 counts['floors'] += 1
 
-            # Normalise and resolve/create brand
+            # Normalise and resolve/create brand and model
             brand_raw = row.get('brand', '').strip()
             brand_str = title_name(brand_raw) if brand_raw else ''
+            model_raw = row.get('model', '').strip()
+            model_str = title_name(model_raw) if model_raw else ''
+
+            brand_id = None
             if brand_raw:
                 b_row = db.execute(
                     'SELECT id FROM brands WHERE LOWER(name) = ?',
@@ -1015,25 +1026,23 @@ def import_devices():
                 ).fetchone()
                 if not b_row:
                     db.execute('INSERT OR IGNORE INTO brands (name) VALUES (?)', (brand_str,))
-
-            # Normalise and resolve/create model
-            model_raw = row.get('model', '').strip()
-            model_str = title_name(model_raw) if model_raw else ''
-            if model_raw and brand_raw:
-                b_row2 = db.execute(
-                    'SELECT id FROM brands WHERE LOWER(name) = ?',
-                    (normalize_name(brand_raw),)
-                ).fetchone()
-                if b_row2:
-                    m_row = db.execute(
-                        'SELECT id FROM models WHERE brand_id = ? AND LOWER(name) = ?',
-                        (b_row2['id'], normalize_name(model_raw))
+                    b_row = db.execute(
+                        'SELECT id FROM brands WHERE LOWER(name) = ?',
+                        (normalize_name(brand_raw),)
                     ).fetchone()
-                    if not m_row:
-                        db.execute(
-                            'INSERT INTO models (brand_id, name) VALUES (?, ?)',
-                            (b_row2['id'], model_str)
-                        )
+                if b_row:
+                    brand_id = b_row['id']
+
+            if model_raw and brand_id is not None:
+                m_row = db.execute(
+                    'SELECT id FROM models WHERE brand_id = ? AND LOWER(name) = ?',
+                    (brand_id, normalize_name(model_raw))
+                ).fetchone()
+                if not m_row:
+                    db.execute(
+                        'INSERT OR IGNORE INTO models (brand_id, name) VALUES (?, ?)',
+                        (brand_id, model_str)
+                    )
 
             # Insert device
             rental_period = row.get('rental_period', '').strip() or None

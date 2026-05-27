@@ -931,8 +931,137 @@ def import_devices():
     if errors:
         return jsonify({'status': 'error', 'imported': 0, 'errors': errors}), 422
 
-    # Phase 2 — commit (Task 3)
-    return jsonify({'status': 'success', 'imported': 0, 'created': {'cities': 0, 'buildings': 0, 'floors': 0}})
+    # Phase 2 — commit
+    counts = {'cities': 0, 'buildings': 0, 'floors': 0}
+    imported = 0
+
+    def _safe_float(v):
+        try:
+            return float(v) if v and str(v).strip() else None
+        except (ValueError, TypeError):
+            return None
+
+    def _safe_int(v):
+        try:
+            return int(v) if v and str(v).strip() else 0
+        except (ValueError, TypeError):
+            return 0
+
+    with get_db() as db:
+        for i, row in enumerate(rows, start=2):
+            client_name = row['client'].strip()
+            client_row  = db.execute(
+                'SELECT id FROM clients WHERE LOWER(name) = LOWER(?)',
+                (client_name,)
+            ).fetchone()
+            client_id = client_row['id']
+
+            # Resolve or create city
+            city_name = row['city'].strip()
+            city_row  = db.execute(
+                'SELECT id FROM cities WHERE client_id = ? AND LOWER(name) = LOWER(?)',
+                (client_id, city_name)
+            ).fetchone()
+            if city_row:
+                city_id = city_row['id']
+            else:
+                cur = db.execute(
+                    'INSERT INTO cities (client_id, name) VALUES (?, ?)',
+                    (client_id, title_name(city_name))
+                )
+                city_id = cur.lastrowid
+                counts['cities'] += 1
+
+            # Resolve or create building
+            building_name = row['building'].strip()
+            building_row  = db.execute(
+                'SELECT id FROM buildings WHERE city_id = ? AND LOWER(name) = LOWER(?)',
+                (city_id, building_name)
+            ).fetchone()
+            if building_row:
+                building_id = building_row['id']
+            else:
+                cur = db.execute(
+                    'INSERT INTO buildings (city_id, name) VALUES (?, ?)',
+                    (city_id, title_name(building_name))
+                )
+                building_id = cur.lastrowid
+                counts['buildings'] += 1
+
+            # Resolve or create floor (matched by level, not label)
+            floor_level_int  = int(row['floor_level'])
+            floor_label_text = row.get('floor_label', '').strip() or floor_label(floor_level_int)
+            floor_row = db.execute(
+                'SELECT id FROM floors WHERE building_id = ? AND level = ?',
+                (building_id, floor_level_int)
+            ).fetchone()
+            if floor_row:
+                floor_id = floor_row['id']
+            else:
+                cur = db.execute(
+                    'INSERT INTO floors (building_id, level, label) VALUES (?, ?, ?)',
+                    (building_id, floor_level_int, floor_label_text)
+                )
+                floor_id = cur.lastrowid
+                counts['floors'] += 1
+
+            # Normalise and resolve/create brand
+            brand_raw = row.get('brand', '').strip()
+            brand_str = title_name(brand_raw) if brand_raw else ''
+            if brand_raw:
+                b_row = db.execute(
+                    'SELECT id FROM brands WHERE LOWER(name) = ?',
+                    (normalize_name(brand_raw),)
+                ).fetchone()
+                if not b_row:
+                    db.execute('INSERT OR IGNORE INTO brands (name) VALUES (?)', (brand_str,))
+
+            # Normalise and resolve/create model
+            model_raw = row.get('model', '').strip()
+            model_str = title_name(model_raw) if model_raw else ''
+            if model_raw and brand_raw:
+                b_row2 = db.execute(
+                    'SELECT id FROM brands WHERE LOWER(name) = ?',
+                    (normalize_name(brand_raw),)
+                ).fetchone()
+                if b_row2:
+                    m_row = db.execute(
+                        'SELECT id FROM models WHERE brand_id = ? AND LOWER(name) = ?',
+                        (b_row2['id'], normalize_name(model_raw))
+                    ).fetchone()
+                    if not m_row:
+                        db.execute(
+                            'INSERT INTO models (brand_id, name) VALUES (?, ?)',
+                            (b_row2['id'], model_str)
+                        )
+
+            # Insert device
+            rental_period = row.get('rental_period', '').strip() or None
+            db.execute('''
+                INSERT INTO devices
+                    (id, floor_id, type, label, brand, model, serial, notes,
+                     avg_mono, avg_colour, mono_rate, colour_rate,
+                     rental_amount, rental_period, x_pct, y_pct)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)
+            ''', (
+                str(uuid.uuid4()),
+                floor_id,
+                row.get('device_type', 'printer').strip().lower(),
+                row.get('label', '').strip() or 'Device',
+                brand_str,
+                model_str,
+                row.get('serial', '').strip(),
+                row.get('notes', '').strip(),
+                _safe_int(row.get('avg_mono')),
+                _safe_int(row.get('avg_colour')),
+                _safe_float(row.get('mono_rate')),
+                _safe_float(row.get('colour_rate')),
+                _safe_float(row.get('rental_amount')),
+                rental_period,
+            ))
+            imported += 1
+
+    return jsonify({'status': 'success', 'imported': imported, 'created': counts})
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

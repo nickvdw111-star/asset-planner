@@ -904,8 +904,8 @@ def import_devices():
             # client must exist
             client_name = row.get('client', '').strip()
             client_row  = db.execute(
-                'SELECT id FROM clients WHERE LOWER(name) = ?',
-                (normalize_name(client_name),)
+                'SELECT id FROM clients WHERE LOWER(name) = LOWER(?)',
+                (client_name.strip(),)
             ).fetchone()
             if not client_row:
                 errors.append({'row': i, 'type': 'client_not_found',

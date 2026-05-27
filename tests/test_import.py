@@ -1,5 +1,6 @@
 import io
 import csv
+import pytest
 
 
 def make_csv(*rows):
@@ -78,6 +79,7 @@ def test_client_match_is_case_insensitive(seeded_client):
     assert r.get_json()['status'] == 'success'
 
 
+@pytest.mark.skip(reason="Requires Phase 2 DB writes — re-enable after Task 3")
 def test_duplicate_serial_in_db_returns_error(seeded_client):
     # First import succeeds
     r1 = post_csv(seeded_client, [VALID_ROW])

@@ -7,16 +7,16 @@
   --surface2: #252836;
   --border:   #2a2d3e;
   --border2:  #374151;
-  --accent:   #2563eb;
-  --accent-h: #3b82f6;
+  --accent:   #16a34a;
+  --accent-h: #22c55e;
   --text:     #e0e0e0;
   --muted:    #6b7280;
   --muted2:   #4b5563;
   --danger:   #7f1d1d;
   --danger-t: #fca5a5;
-  --success:  #16a34a;
-  --badge-bg: #1e3a5f;
-  --badge-t:  #93c5fd;
+  --success:  #15803d;
+  --badge-bg: #14291e;
+  --badge-t:  #86efac;
 }
 
 body {

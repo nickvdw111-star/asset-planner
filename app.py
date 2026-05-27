@@ -113,6 +113,8 @@ def init_db():
             db.execute('ALTER TABLE models ADD COLUMN colour_rate REAL')
         if 'optimiser_allowed' not in mcols:
             db.execute('ALTER TABLE models ADD COLUMN optimiser_allowed INTEGER NOT NULL DEFAULT 0')
+        if 'rental_amount' not in mcols:
+            db.execute('ALTER TABLE models ADD COLUMN rental_amount REAL')
 
         cols = [r[1] for r in db.execute('PRAGMA table_info(devices)').fetchall()]
         if 'avg_mono' not in cols:
@@ -408,14 +410,15 @@ def create_model(brand_id):
     name = d.get('name', '').strip()
     if not name:
         return jsonify({'error': 'name required'}), 400
-    colour_type = d.get('colour_type', 'mono')
-    page_size   = d.get('page_size', 'A4')
-    mono_rate   = d.get('mono_rate') or None
-    colour_rate = d.get('colour_rate') or None
+    colour_type   = d.get('colour_type', 'mono')
+    page_size     = d.get('page_size', 'A4')
+    mono_rate     = d.get('mono_rate') or None
+    colour_rate   = d.get('colour_rate') or None
+    rental_amount = d.get('rental_amount') or None
     with get_db() as db:
         cur = db.execute(
-            'INSERT INTO models (brand_id, name, colour_type, page_size, mono_rate, colour_rate) VALUES (?,?,?,?,?,?)',
-            (brand_id, name, colour_type, page_size, mono_rate, colour_rate)
+            'INSERT INTO models (brand_id, name, colour_type, page_size, mono_rate, colour_rate, rental_amount) VALUES (?,?,?,?,?,?,?)',
+            (brand_id, name, colour_type, page_size, mono_rate, colour_rate, rental_amount)
         )
         row = db.execute('SELECT * FROM models WHERE id = ?', (cur.lastrowid,)).fetchone()
     return jsonify(dict(row)), 201
@@ -430,11 +433,12 @@ def update_model(model_id):
     page_size         = d.get('page_size', 'A4')
     mono_rate         = d.get('mono_rate') or None
     colour_rate       = d.get('colour_rate') or None
+    rental_amount     = d.get('rental_amount') or None
     optimiser_allowed = 1 if d.get('optimiser_allowed') else 0
     with get_db() as db:
         db.execute(
-            'UPDATE models SET name=?, colour_type=?, page_size=?, mono_rate=?, colour_rate=?, optimiser_allowed=? WHERE id=?',
-            (name, colour_type, page_size, mono_rate, colour_rate, optimiser_allowed, model_id)
+            'UPDATE models SET name=?, colour_type=?, page_size=?, mono_rate=?, colour_rate=?, rental_amount=?, optimiser_allowed=? WHERE id=?',
+            (name, colour_type, page_size, mono_rate, colour_rate, rental_amount, optimiser_allowed, model_id)
         )
         row = db.execute('SELECT * FROM models WHERE id = ?', (model_id,)).fetchone()
     return jsonify(dict(row))

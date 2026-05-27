@@ -185,7 +185,7 @@
     }
     .leaflet-tooltip.map-label::before { display: none; }
     .map-label-inner { text-align: center; line-height: 1.35; text-shadow: 0 1px 3px #000, 0 0 6px #000, 0 0 10px #000; }
-    .map-label-client  { font-size: 10px; color: #93c5fd; font-weight: 500; letter-spacing: 0.03em; }
+    .map-label-client  { font-size: 10px; color: #86efac; font-weight: 500; letter-spacing: 0.03em; }
     .map-label-building { font-size: 12px; color: #f0f0f0; font-weight: 700; }
 
     /* ── Leaflet popup ── */
@@ -233,7 +233,7 @@
   <div style="margin-left:auto; display:flex; gap:8px;">
     <a id="reports-link" href="/reports" class="btn btn-neutral" style="text-decoration:none">📊 Reports</a>
     <a id="tco-link" href="/tco" class="btn btn-neutral" style="text-decoration:none">💰 TCO Calculator</a>
-    <a href="/admin" class="btn btn-neutral" style="text-decoration:none">⚙️ Admin</a>
+    <a id="admin-link" href="/admin" class="btn btn-neutral" style="text-decoration:none">⚙️ Admin</a>
   </div>
 </header>
 
@@ -603,6 +603,7 @@ function clearClient() {
   document.getElementById('no-client-hint').classList.remove('hidden');
   document.getElementById('tree-root').innerHTML = '';
   document.getElementById('edit-client-btn').style.display = 'none';
+  document.getElementById('admin-link').href = '/admin';
   renderMap();
 }
 
@@ -630,6 +631,7 @@ function renderClientPanel() {
   document.getElementById('edit-client-btn').style.display = 'inline-flex';
   document.getElementById('tco-link').href     = `/tco?client=${activeClient.id}`;
   document.getElementById('reports-link').href = `/reports?client=${activeClient.id}`;
+  document.getElementById('admin-link').href   = `/admin?client=${activeClient.id}`;
 
   // Stats
   let totalBuildings = 0, totalDevices = 0;
@@ -791,8 +793,8 @@ function renderMap() {
 
       const marker = L.circleMarker([lat, lng], {
         radius: 8,
-        fillColor: '#3b82f6',
-        color: '#1d4ed8',
+        fillColor: '#22c55e',
+        color: '#15803d',
         weight: 2,
         opacity: 1,
         fillOpacity: 0.85,

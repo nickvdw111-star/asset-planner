@@ -859,6 +859,7 @@ def title_name(s):
 
 IMPORT_REQUIRED_COLS = {'client', 'city', 'building', 'floor_level', 'floor_label',
                         'device_type', 'label', 'serial'}
+IMPORT_VALID_DEVICE_TYPES = {'printer', 'mfp', 'scanner', 'print_server'}
 
 @app.route('/api/admin/import-devices', methods=['POST'])
 def import_devices():
@@ -895,6 +896,12 @@ def import_devices():
             except (ValueError, TypeError):
                 errors.append({'row': i, 'type': 'parse_error',
                                'detail': f"floor_level must be an integer, got: '{row.get('floor_level', '')}'"}); continue
+
+            # device_type must be a valid value
+            dtype = row.get('device_type', '').strip().lower()
+            if dtype not in IMPORT_VALID_DEVICE_TYPES:
+                errors.append({'row': i, 'type': 'parse_error',
+                               'detail': f"device_type must be one of: {', '.join(sorted(IMPORT_VALID_DEVICE_TYPES))}, got: '{row.get('device_type', '')}'"}); continue
 
             # serial required
             serial = row.get('serial', '').strip()

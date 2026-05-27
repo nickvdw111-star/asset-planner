@@ -447,6 +447,7 @@ function openEditor(model, brand) {
   selectedModel = { model, brand };
   document.getElementById('model-editor').style.display = 'block';
   document.getElementById('add-brand-section').style.display = 'none';
+  document.getElementById('fleet-import-section').style.display = 'none';
   document.getElementById('editor-title').textContent = `✏️ ${brand.name} — ${model.name}`;
   document.getElementById('ed-name').value = model.name;
 
@@ -471,6 +472,7 @@ function closeEditor() {
   selectedModel = null;
   document.getElementById('model-editor').style.display = 'none';
   document.getElementById('add-brand-section').style.display = 'block';
+  document.getElementById('fleet-import-section').style.display = 'block';
   document.querySelectorAll('.model-row').forEach(r => r.classList.remove('selected'));
 }
 
@@ -566,6 +568,9 @@ async function runImport() {
 
   try {
     const res  = await fetch('/api/admin/import-devices', { method: 'POST', body: form });
+    if (!res.ok && !res.headers.get('content-type')?.includes('application/json')) {
+      throw new Error(`Server error ${res.status}`);
+    }
     const body = await res.json();
     result.style.display = 'block';
 
@@ -587,8 +592,16 @@ async function runImport() {
       table.innerHTML = '<thead><tr><th>Row</th><th>Issue</th><th>Detail</th></tr></thead>';
       const tbody = document.createElement('tbody');
       body.errors.forEach(e => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${e.row || '—'}</td><td>${e.type}</td><td>${e.detail}</td>`;
+        const tr      = document.createElement('tr');
+        const tdRow    = document.createElement('td');
+        const tdType   = document.createElement('td');
+        const tdDetail = document.createElement('td');
+        tdRow.textContent    = e.row || '—';
+        tdType.textContent   = e.type;
+        tdDetail.textContent = e.detail;
+        tr.appendChild(tdRow);
+        tr.appendChild(tdType);
+        tr.appendChild(tdDetail);
         tbody.appendChild(tr);
       });
       table.appendChild(tbody);

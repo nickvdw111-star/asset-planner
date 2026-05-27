@@ -1,3 +1,5 @@
+import csv
+import io
 import os
 import uuid
 from pathlib import Path
@@ -838,6 +840,99 @@ def get_tree():
             cd['device_count'] = sum(ci['device_count'] for ci in cd['cities'])
             result.append(cd)
     return jsonify(result)
+
+
+# ── Fleet Import ──────────────────────────────────────────────────────────────
+
+def normalize_name(s):
+    return ' '.join(s.strip().split()).lower()
+
+def title_name(s):
+    return ' '.join(s.strip().split()).title()
+
+IMPORT_REQUIRED_COLS = {'client', 'city', 'building', 'floor_level', 'floor_label',
+                        'device_type', 'label', 'serial'}
+
+@app.route('/api/admin/import-devices', methods=['POST'])
+def import_devices():
+    file = request.files.get('file')
+    if not file:
+        return jsonify({'status': 'error', 'imported': 0,
+                        'errors': [{'row': 0, 'type': 'parse_error',
+                                    'detail': 'No file provided'}]}), 400
+
+    try:
+        content = file.read().decode('utf-8-sig')
+        reader  = csv.DictReader(io.StringIO(content))
+        rows    = list(reader)
+        fieldnames = set(reader.fieldnames or [])
+    except Exception as exc:
+        return jsonify({'status': 'error', 'imported': 0,
+                        'errors': [{'row': 0, 'type': 'parse_error',
+                                    'detail': f'Could not read CSV: {exc}'}]}), 400
+
+    missing_cols = IMPORT_REQUIRED_COLS - fieldnames
+    if missing_cols:
+        return jsonify({'status': 'error', 'imported': 0,
+                        'errors': [{'row': 0, 'type': 'parse_error',
+                                    'detail': f'Missing required columns: {", ".join(sorted(missing_cols))}'}]}), 400
+
+    errors = []
+    seen_serials = {}  # serial -> first row number (1-based, header = row 1)
+
+    with get_db() as db:
+        for i, row in enumerate(rows, start=2):
+            # floor_level must be integer
+            try:
+                int(row.get('floor_level', ''))
+            except (ValueError, TypeError):
+                errors.append({'row': i, 'type': 'parse_error',
+                               'detail': f"floor_level must be an integer, got: '{row.get('floor_level', '')}'"}); continue
+
+            # serial required
+            serial = row.get('serial', '').strip()
+            if not serial:
+                errors.append({'row': i, 'type': 'parse_error',
+                               'detail': 'serial is required'}); continue
+
+            # duplicate serial within CSV
+            if serial in seen_serials:
+                errors.append({'row': i, 'type': 'duplicate_serial',
+                               'detail': f"Serial '{serial}' already appears on row {seen_serials[serial]} of this CSV"}); continue
+            seen_serials[serial] = i
+
+            # client must exist
+            client_name = row.get('client', '').strip()
+            client_row  = db.execute(
+                'SELECT id FROM clients WHERE LOWER(name) = ?',
+                (normalize_name(client_name),)
+            ).fetchone()
+            if not client_row:
+                errors.append({'row': i, 'type': 'client_not_found',
+                               'detail': f"Client '{client_name}' not found"}); continue
+
+            # duplicate serial in DB
+            existing = db.execute('''
+                SELECT d.serial, f.label AS floor_label,
+                       b.name AS building_name, ci.name AS city_name
+                FROM devices d
+                JOIN floors    f  ON f.id  = d.floor_id
+                JOIN buildings b  ON b.id  = f.building_id
+                JOIN cities    ci ON ci.id = b.city_id
+                WHERE d.serial = ?
+            ''', (serial,)).fetchone()
+            if existing:
+                errors.append({'row': i, 'type': 'duplicate_serial',
+                               'detail': (f"Serial '{serial}' already exists on "
+                                          f"{existing['floor_label']}, "
+                                          f"{existing['building_name']}, "
+                                          f"{existing['city_name']}")}); continue
+
+    if errors:
+        return jsonify({'status': 'error', 'imported': 0, 'errors': errors}), 422
+
+    # Phase 2 — commit (Task 3)
+    return jsonify({'status': 'success', 'imported': 0, 'created': {'cities': 0, 'buildings': 0, 'floors': 0}})
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

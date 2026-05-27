@@ -113,6 +113,22 @@
       z-index: 9999; white-space: nowrap;
     }
     #toast.show { transform: translateX(-50%) translateY(0); }
+
+    .import-card {
+      background: var(--surface); border: 1px solid var(--border2); border-radius: 10px;
+      padding: 22px; max-width: 540px; margin-bottom: 24px;
+    }
+    .import-card p { font-size: 13px; color: var(--muted); line-height: 1.7; margin: 0 0 14px; }
+    .import-upload-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+    .import-upload-row input[type="file"] { flex: 1; font-size: 13px; color: var(--text); }
+
+    #import-result { margin-top: 16px; border-radius: 8px; padding: 14px 16px; font-size: 13px; }
+    #import-result.success { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); color: #86efac; }
+    #import-result.error   { background: rgba(239,68,68,0.1);  border: 1px solid rgba(239,68,68,0.3);  color: #fca5a5; }
+    #import-result .err-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+    #import-result .err-table th { text-align: left; padding: 4px 8px; color: var(--muted); font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    #import-result .err-table td { padding: 5px 8px; border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: top; }
+    #import-result .err-table tr:last-child td { border-bottom: none; }
   </style>
 </head>
 <body>
@@ -200,6 +216,24 @@
         Add a brand first, then expand it and click <b>+ Add Model</b>.<br><br>
         Click any model to set its <b>colour type</b> (Mono / Colour), <b>page size</b> (A4 / A3), and <b>standard rates</b>.<br><br>
         Rates set here will <b>auto-fill</b> when that model is selected on a device or in the TCO calculator.
+      </div>
+    </div>
+
+    <!-- Fleet Import -->
+    <div id="fleet-import-section">
+      <h2>Fleet Import</h2>
+      <div class="import-card">
+        <p>
+          Upload a CSV to bulk-import devices across all locations.<br>
+          Clients must already exist. Cities, buildings, and floors are created automatically.<br>
+          Any serial number conflict or unknown client stops the entire import.
+        </p>
+        <button class="btn btn-neutral" onclick="downloadTemplate()">⬇ Download Template</button>
+        <div class="import-upload-row">
+          <input type="file" id="import-file" accept=".csv">
+          <button class="btn btn-primary" id="import-btn" disabled onclick="runImport()">Import Devices</button>
+        </div>
+        <div id="import-result" style="display:none"></div>
       </div>
     </div>
 
@@ -488,6 +522,89 @@ const submitBrand = async () => {
 
 addBrandBtn.onclick = submitBrand;
 newBrandInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitBrand(); });
+
+// ── Fleet Import ──────────────────────────────────────────────────────────────
+
+document.getElementById('import-file').addEventListener('change', function () {
+  document.getElementById('import-btn').disabled = !this.files.length;
+  document.getElementById('import-result').style.display = 'none';
+});
+
+function downloadTemplate() {
+  const headers = [
+    'client','city','building','floor_level','floor_label',
+    'device_type','label','brand','model','serial','notes',
+    'avg_mono','avg_colour','mono_rate','colour_rate','rental_amount','rental_period'
+  ];
+  const example = [
+    'Acme Corp','Johannesburg','Head Office','0','Ground',
+    'mfp','Reception MFP','Ricoh','IM C2000','ABC12345','Main entrance',
+    '5000','500','0.08','0.45','1500','36'
+  ];
+  const csv = [headers.join(','), example.join(',')].join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'printmap-fleet-template.csv';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+async function runImport() {
+  const file = document.getElementById('import-file').files[0];
+  if (!file) return;
+
+  const btn    = document.getElementById('import-btn');
+  const result = document.getElementById('import-result');
+  btn.disabled = true;
+  btn.textContent = 'Importing…';
+  result.style.display = 'none';
+  result.className = '';
+
+  const form = new FormData();
+  form.append('file', file);
+
+  try {
+    const res  = await fetch('/api/admin/import-devices', { method: 'POST', body: form });
+    const body = await res.json();
+    result.style.display = 'block';
+
+    if (body.status === 'success') {
+      const c = body.created;
+      const parts = [];
+      if (c.cities)    parts.push(`${c.cities} cit${c.cities === 1 ? 'y' : 'ies'}`);
+      if (c.buildings) parts.push(`${c.buildings} building${c.buildings === 1 ? '' : 's'}`);
+      if (c.floors)    parts.push(`${c.floors} floor${c.floors === 1 ? '' : 's'}`);
+      const created = parts.length ? ` ${parts.join(', ')} created.` : '';
+      result.className = 'success';
+      result.textContent = `✓ ${body.imported} device${body.imported === 1 ? '' : 's'} imported.${created}`;
+    } else {
+      result.className = 'error';
+      const banner = document.createElement('div');
+      banner.textContent = `✗ Import stopped — ${body.errors.length} issue${body.errors.length === 1 ? '' : 's'} found. Fix your CSV and re-upload.`;
+      const table = document.createElement('table');
+      table.className = 'err-table';
+      table.innerHTML = '<thead><tr><th>Row</th><th>Issue</th><th>Detail</th></tr></thead>';
+      const tbody = document.createElement('tbody');
+      body.errors.forEach(e => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${e.row || '—'}</td><td>${e.type}</td><td>${e.detail}</td>`;
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      result.innerHTML = '';
+      result.appendChild(banner);
+      result.appendChild(table);
+    }
+  } catch (err) {
+    result.style.display = 'block';
+    result.className = 'error';
+    result.textContent = `✗ Network error: ${err.message}`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Import Devices';
+  }
+}
 
 load();
 </script>

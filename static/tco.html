@@ -8,112 +8,77 @@
     body { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
     header {
-      padding: 12px 20px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-shrink: 0;
+      padding: 12px 20px; background: var(--surface); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 12px; flex-shrink: 0;
     }
     header h1 { font-size: 17px; font-weight: 600; }
 
-    /* Client picker bar */
     #client-bar {
-      padding: 10px 20px;
-      background: var(--bg);
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-shrink: 0;
+      padding: 10px 20px; background: var(--bg); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px; flex-shrink: 0;
     }
     #client-bar label { font-size: 12px; color: var(--muted); white-space: nowrap; }
     #client-sel {
-      flex: 0 0 260px;
-      background: var(--surface);
-      border: 1px solid var(--border2);
-      border-radius: 6px;
-      color: var(--text);
-      font-size: 13px;
-      padding: 7px 10px;
-      outline: none;
-      cursor: pointer;
-      font-family: inherit;
+      flex: 0 0 260px; background: var(--surface); border: 1px solid var(--border2);
+      border-radius: 6px; color: var(--text); font-size: 13px; padding: 7px 10px;
+      outline: none; cursor: pointer; font-family: inherit;
     }
     #client-sel:focus { border-color: var(--accent-h); }
     #client-sel option { background: var(--surface2); }
-    #load-status { font-size: 12px; color: var(--muted); }
-    #sync-status { font-size: 12px; margin-left: auto; }
+    #load-status  { font-size: 12px; color: var(--muted); }
+    #sync-status  { font-size: 12px; margin-left: auto; }
     #sync-status.saving { color: var(--accent-h); }
     #sync-status.saved  { color: #4ade80; }
     #sync-status.error  { color: var(--danger-t); }
 
-    .tco-wrap {
-      flex: 1;
-      overflow: auto;
-      padding: 20px 24px;
+    /* Scenario tabs */
+    #scenario-tabs {
+      display: flex; background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 0 20px; flex-shrink: 0;
     }
+    .stab {
+      padding: 11px 20px; font-size: 13px; font-weight: 500; color: var(--muted);
+      cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
+      transition: color 0.15s, border-color 0.15s; user-select: none;
+    }
+    .stab:hover { color: var(--text); }
+    .stab.active { color: var(--text); border-bottom-color: var(--accent); }
 
-    /* Summary cards */
-    .summary-bar {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 20px;
-      flex-wrap: wrap;
+    /* Action bar */
+    #action-bar {
+      padding: 8px 20px; background: var(--bg); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px; flex-shrink: 0; min-height: 44px;
     }
+    #action-bar .hint { font-size: 12px; color: var(--muted2); }
+
+    /* Table area */
+    .tco-wrap { flex: 1; overflow: auto; padding: 20px 24px; }
+
+    .summary-bar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
     .summary-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px 18px;
-      min-width: 150px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px 18px; min-width: 150px;
     }
     .summary-card .sc-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
     .summary-card .sc-value { font-size: 20px; font-weight: 700; color: var(--text); }
     .summary-card.highlight .sc-value { color: #4ade80; }
+    .summary-card.savings .sc-value   { color: #facc15; }
 
-    /* Table */
     .tco-table-wrap { overflow: visible; }
-
-    #tco-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-      min-width: 1180px;
-    }
+    #tco-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1180px; }
     #tco-table thead { position: sticky; top: 0; z-index: 10; }
     #tco-table th {
-      background: var(--surface);
-      color: var(--muted);
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      padding: 10px 8px;
-      border-bottom: 2px solid var(--border2);
-      white-space: nowrap;
-      text-align: left;
+      background: var(--surface); color: var(--muted); font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.05em; padding: 10px 8px;
+      border-bottom: 2px solid var(--border2); white-space: nowrap; text-align: left;
     }
-    #tco-table td {
-      padding: 5px 6px;
-      border-bottom: 1px solid var(--border);
-      vertical-align: middle;
-    }
+    #tco-table td { padding: 5px 6px; border-bottom: 1px solid var(--border); vertical-align: middle; }
     #tco-table tbody tr:hover td { background: var(--surface2); }
 
-    /* Inline inputs */
     .tco-input {
-      background: transparent;
-      border: 1px solid transparent;
-      border-radius: 5px;
-      color: var(--text);
-      font-size: 13px;
-      font-family: inherit;
-      padding: 4px 7px;
-      width: 100%;
-      outline: none;
-      transition: border-color 0.15s, background 0.15s;
+      background: transparent; border: 1px solid transparent; border-radius: 5px;
+      color: var(--text); font-size: 13px; font-family: inherit; padding: 4px 7px;
+      width: 100%; outline: none; transition: border-color 0.15s, background 0.15s;
       box-sizing: border-box;
     }
     .tco-input:focus, .tco-input:hover { border-color: var(--border2); background: var(--bg); }
@@ -121,11 +86,9 @@
     select.tco-input { cursor: pointer; }
     select.tco-input option { background: var(--surface2); }
 
-    /* Device name cell */
     .device-name-wrap { display: flex; flex-direction: column; gap: 1px; }
     .device-location { font-size: 11px; color: var(--muted2); padding: 0 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    /* Column widths */
     .col-num    { width: 32px; color: var(--muted2); text-align: center; font-size: 11px; }
     .col-device { width: 160px; }
     .col-brand  { width: 120px; }
@@ -138,26 +101,13 @@
     .col-tco    { width: 115px; text-align: right; }
     .col-del    { width: 32px; }
 
-    /* TCO value */
-    .tco-value {
-      font-weight: 700;
-      color: var(--accent-h);
-      text-align: right;
-      padding-right: 10px;
-      white-space: nowrap;
-    }
+    .tco-value { font-weight: 700; color: var(--accent-h); text-align: right; padding-right: 10px; white-space: nowrap; }
     .tco-value.zero { color: var(--muted2); font-weight: 400; }
 
-    /* Footer */
-    #tco-table tfoot td {
-      border-top: 2px solid var(--border2);
-      border-bottom: none;
-      padding: 10px 6px;
-    }
+    #tco-table tfoot td { border-top: 2px solid var(--border2); border-bottom: none; padding: 10px 6px; }
     .totals-label { color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; text-align: right; padding-right: 10px; }
     .totals-tco   { font-size: 16px; font-weight: 700; color: #4ade80; text-align: right; padding-right: 10px; white-space: nowrap; }
 
-    /* Delete btn */
     .del-btn {
       background: none; border: none; color: var(--muted2); cursor: pointer;
       font-size: 14px; padding: 4px 6px; border-radius: 4px; line-height: 1;
@@ -165,7 +115,6 @@
     }
     .del-btn:hover { color: var(--danger-t); background: rgba(239,68,68,0.1); }
 
-    /* Empty state */
     #empty-hint {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       padding: 60px 20px; color: var(--muted2); gap: 12px; text-align: center;
@@ -174,7 +123,27 @@
     #empty-hint p { font-size: 13px; line-height: 1.7; }
     #empty-hint.hidden { display: none; }
 
-    /* Toast */
+    /* Optimised panel */
+    #opt-panel { flex: 1; overflow: auto; padding: 24px; display: none; flex-direction: column; gap: 16px; }
+    #opt-panel.active { display: flex; }
+
+    #opt-empty {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 60px 20px; color: var(--muted2); gap: 12px; text-align: center;
+    }
+    #opt-empty .big { font-size: 48px; opacity: 0.35; }
+    #opt-empty p { font-size: 13px; line-height: 1.7; max-width: 420px; }
+
+    #opt-results .opt-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    #opt-results .opt-table th {
+      background: var(--surface); color: var(--muted); font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.05em; padding: 10px 8px;
+      border-bottom: 2px solid var(--border2); white-space: nowrap; text-align: left;
+    }
+    #opt-results .opt-table td { padding: 8px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    #opt-results .opt-table tbody tr:hover td { background: var(--surface2); }
+    #opt-results .opt-note { font-size: 12px; color: var(--muted2); line-height: 1.6; }
+
     #toast {
       position: fixed; bottom: 24px; left: 50%;
       transform: translateX(-50%) translateY(80px);
@@ -191,14 +160,13 @@
 <header>
   <a id="back-btn" href="/" class="btn btn-neutral btn-sm" style="text-decoration:none">← Dashboard</a>
   <h1>💰 TCO Calculator</h1>
-  <span style="font-size:12px; color:var(--muted)">Total Cost of Ownership — monthly per device</span>
-  <div style="margin-left:auto; display:flex; gap:8px;">
+  <span style="font-size:12px; color:var(--muted)">Total Cost of Ownership — three-scenario analysis</span>
+  <div id="header-actions" style="margin-left:auto; display:flex; gap:8px;">
     <button class="btn btn-ghost btn-sm" id="export-btn">⬇ Export CSV</button>
     <button class="btn btn-primary btn-sm" id="add-btn">+ Add Device</button>
   </div>
 </header>
 
-<!-- Client selector -->
 <div id="client-bar">
   <label>Client</label>
   <select id="client-sel">
@@ -208,37 +176,26 @@
   <span id="sync-status"></span>
 </div>
 
-<div class="tco-wrap">
+<div id="scenario-tabs">
+  <div class="stab active" id="stab-current"   onclick="switchScenario('current')">Current State</div>
+  <div class="stab"        id="stab-future"    onclick="switchScenario('future')">Future State</div>
+  <div class="stab"        id="stab-optimised" onclick="switchScenario('optimised')">Optimised</div>
+</div>
 
-  <!-- Summary cards -->
+<div id="action-bar">
+  <span class="hint" id="action-hint"></span>
+</div>
+
+<!-- Table panel (current & future) -->
+<div class="tco-wrap" id="table-panel">
   <div class="summary-bar" id="summary-bar" style="display:none">
-    <div class="summary-card">
-      <div class="sc-label">Devices</div>
-      <div class="sc-value" id="sum-devices">0</div>
-    </div>
-    <div class="summary-card">
-      <div class="sc-label">Mono pages / mo</div>
-      <div class="sc-value" id="sum-mono">0</div>
-    </div>
-    <div class="summary-card">
-      <div class="sc-label">Colour pages / mo</div>
-      <div class="sc-value" id="sum-colour">0</div>
-    </div>
-    <div class="summary-card">
-      <div class="sc-label">Click charges / mo</div>
-      <div class="sc-value" id="sum-clicks">R 0.00</div>
-    </div>
-    <div class="summary-card">
-      <div class="sc-label">Rental / mo</div>
-      <div class="sc-value" id="sum-rental">R 0.00</div>
-    </div>
-    <div class="summary-card highlight">
-      <div class="sc-label">Total TCO / mo</div>
-      <div class="sc-value" id="sum-tco">R 0.00</div>
-    </div>
+    <div class="summary-card"><div class="sc-label">Devices</div><div class="sc-value" id="sum-devices">0</div></div>
+    <div class="summary-card"><div class="sc-label">Mono pages / mo</div><div class="sc-value" id="sum-mono">0</div></div>
+    <div class="summary-card"><div class="sc-label">Colour pages / mo</div><div class="sc-value" id="sum-colour">0</div></div>
+    <div class="summary-card"><div class="sc-label">Click charges / mo</div><div class="sc-value" id="sum-clicks">R 0.00</div></div>
+    <div class="summary-card"><div class="sc-label">Rental / mo</div><div class="sc-value" id="sum-rental">R 0.00</div></div>
+    <div class="summary-card highlight"><div class="sc-label">Total TCO / mo</div><div class="sc-value" id="sum-tco">R 0.00</div></div>
   </div>
-
-  <!-- Table -->
   <div class="tco-table-wrap">
     <table id="tco-table">
       <thead>
@@ -268,49 +225,104 @@
       </tfoot>
     </table>
   </div>
-
-  <!-- Empty state -->
   <div id="empty-hint">
     <div class="big">💰</div>
-    <p>Select a client above to load their devices,<br>or click <strong>+ Add Device</strong> to build a model manually.</p>
+    <p id="empty-text">Select a client above, then capture the fleet or add devices manually.</p>
   </div>
+</div>
 
+<!-- Optimised panel -->
+<div id="opt-panel">
+  <div id="opt-empty">
+    <div class="big">⚙</div>
+    <p>Select a client, make sure the Current State is populated, tick devices in Admin → Catalogue, then click <strong>Run Optimiser</strong>.</p>
+  </div>
+  <div id="opt-results" style="display:none"></div>
 </div>
 
 <div id="toast"></div>
 
 <script>
-// ── Catalogue ─────────────────────────────────────────────────────────────────
+// ── State ─────────────────────────────────────────────────────────────────────
 
 let catalogue = [];
+let clients   = [];
+let currentClientId = null;
+let activeScenario  = 'current';
+let nextId = 1;
+let saveTimer = null;
+
+const scenarios = {
+  current: { rows: [], loaded: false },
+  future:  { rows: [], loaded: false },
+};
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+
+async function api(method, path, body) {
+  const opts = { method, headers: {} };
+  if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  const res = await fetch('/api' + path, opts);
+  if (!res.ok) throw new Error(await res.text());
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+function fmt(n) {
+  return 'R ' + (n || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function calcTco(d) {
+  return ((d.mono_vol || 0) * (d.mono_rate || 0)) +
+         ((d.colour_vol || 0) * (d.colour_rate || 0)) +
+         (d.rental || 0);
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+function setStatus(msg) { document.getElementById('load-status').textContent = msg; }
+function setSyncStatus(state, msg) {
+  const el = document.getElementById('sync-status');
+  el.textContent = msg;
+  el.className = state;
+}
+
+// ── Catalogue ─────────────────────────────────────────────────────────────────
 
 async function loadCatalogue() {
-  try { catalogue = await (await fetch('/api/brands')).json(); } catch { catalogue = []; }
+  try { catalogue = await api('GET', '/brands'); } catch { catalogue = []; }
 }
 
 function brandOptions(selected = '') {
   let h = '<option value="">— Brand —</option>';
-  catalogue.forEach(b => { h += `<option value="${esc(b.name)}"${b.name===selected?' selected':''}>${esc(b.name)}</option>`; });
+  catalogue.forEach(b => { h += `<option value="${esc(b.name)}"${b.name === selected ? ' selected' : ''}>${esc(b.name)}</option>`; });
   return h;
 }
+
 function modelOptions(brandName, selected = '') {
   const brand = catalogue.find(b => b.name === brandName);
   if (!brand?.models?.length) return '<option value="">— Model —</option>';
   let h = '<option value="">— Model —</option>';
-  brand.models.forEach(m => { h += `<option value="${esc(m.name)}"${m.name===selected?' selected':''}>${esc(m.name)}</option>`; });
+  brand.models.forEach(m => { h += `<option value="${esc(m.name)}"${m.name === selected ? ' selected' : ''}>${esc(m.name)}</option>`; });
   return h;
-}
-function esc(s) {
-  return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 }
 
 // ── Clients ───────────────────────────────────────────────────────────────────
 
-let clients = [];
-
 async function loadClients() {
-  try { clients = await (await fetch('/api/clients')).json(); } catch { clients = []; }
-  const sel = document.getElementById('client-sel');
+  try { clients = await api('GET', '/clients'); } catch { clients = []; }
+  const sel  = document.getElementById('client-sel');
   const prev = sel.value;
   sel.innerHTML = '<option value="">— Select a client —</option>';
   clients.forEach(c => {
@@ -323,104 +335,206 @@ async function loadClients() {
 
 document.getElementById('client-sel').addEventListener('change', async e => {
   const id = parseInt(e.target.value);
+  currentClientId = id || null;
+  scenarios.current = { rows: [], loaded: false };
+  scenarios.future  = { rows: [], loaded: false };
+
   if (!id) {
-    rows = [];
     renderRows();
     setStatus('');
     document.getElementById('back-btn').href = '/';
     return;
   }
-  await loadClientDevices(id);
+
   document.getElementById('back-btn').href = `/?client=${id}`;
+
+  if (activeScenario !== 'optimised') {
+    setStatus(`Loading ${activeScenario === 'current' ? 'current' : 'future'} state…`);
+    await loadScenario(activeScenario);
+    setStatus('');
+    renderRows();
+  } else {
+    resetOptimised();
+  }
 });
 
-async function loadClientDevices(clientId) {
-  setStatus('Loading…');
-  try {
-    const devices = await (await fetch(`/api/clients/${clientId}/devices`)).json();
-    rows = devices.map(d => ({
-      id:          nextId++,
-      device_id:   d.id,           // UUID — used to sync back to the API
-      _orig:       d,              // preserve type/notes/coords for PUT payload
-      device_name: d.label        || '',
-      location:    `${d.building_name} · ${d.floor_label}`,
-      brand:       d.brand        || '',
-      model:       d.model        || '',
-      serial:      d.serial       || '',
-      mono_vol:    d.avg_mono     || 0,
-      colour_vol:  d.avg_colour   || 0,
-      mono_rate:   d.mono_rate    || 0,
-      colour_rate: d.colour_rate  || 0,
-      rental:      d.rental_amount|| 0,
-      period:      d.rental_period|| '',
-    }));
-    renderRows();
-    setStatus(devices.length ? `${devices.length} device${devices.length!==1?'s':''} loaded` : 'No devices found for this client');
-  } catch {
-    setStatus('Could not load devices');
+// ── Scenario management ────────────────────────────────────────────────────────
+
+async function switchScenario(name) {
+  activeScenario = name;
+
+  ['current', 'future', 'optimised'].forEach(t => {
+    document.getElementById(`stab-${t}`).classList.toggle('active', t === name);
+  });
+
+  const tablePanel = document.getElementById('table-panel');
+  const optPanel   = document.getElementById('opt-panel');
+  const hdrActions = document.getElementById('header-actions');
+
+  if (name === 'optimised') {
+    tablePanel.style.display = 'none';
+    optPanel.classList.add('active');
+    hdrActions.style.display = 'none';
+    updateActionBar();
+    return;
+  }
+
+  tablePanel.style.display = '';
+  optPanel.classList.remove('active');
+  hdrActions.style.display = '';
+  updateActionBar();
+
+  if (currentClientId && !scenarios[name].loaded) {
+    setStatus('Loading…');
+    await loadScenario(name);
+    setStatus('');
+  }
+  renderRows();
+}
+
+function updateActionBar() {
+  const bar = document.getElementById('action-bar');
+  bar.innerHTML = '';
+
+  if (activeScenario === 'current') {
+    const btn = document.createElement('button');
+    btn.id = 'capture-btn';
+    btn.className = 'btn btn-neutral btn-sm';
+    btn.textContent = '📥 Capture from Fleet';
+    btn.onclick = captureFleet;
+    bar.appendChild(btn);
+    const hint = document.createElement('span');
+    hint.className = 'hint';
+    hint.style.marginLeft = '8px';
+    hint.textContent = 'Pull live device data from the asset planner into this scenario';
+    bar.appendChild(hint);
+  } else if (activeScenario === 'future') {
+    const btn = document.createElement('button');
+    btn.id = 'copy-btn';
+    btn.className = 'btn btn-neutral btn-sm';
+    btn.textContent = '📋 Copy from Current State';
+    btn.onclick = copyFromCurrent;
+    bar.appendChild(btn);
+    const hint = document.createElement('span');
+    hint.className = 'hint';
+    hint.style.marginLeft = '8px';
+    hint.textContent = 'Start the future proposal from the current fleet — then edit';
+    bar.appendChild(hint);
+  } else {
+    const btn = document.createElement('button');
+    btn.id = 'run-opt-btn';
+    btn.className = 'btn btn-primary btn-sm';
+    btn.textContent = '⚙ Run Optimiser';
+    btn.onclick = runOptimiser;
+    bar.appendChild(btn);
+    const hint = document.createElement('span');
+    hint.className = 'hint';
+    hint.style.marginLeft = '8px';
+    hint.textContent = 'Finds the cheapest fleet from allowed devices — per location';
+    bar.appendChild(hint);
   }
 }
 
-function setStatus(msg) {
-  document.getElementById('load-status').textContent = msg;
+async function loadScenario(name) {
+  if (!currentClientId) return;
+  try {
+    const data = await api('GET', `/clients/${currentClientId}/tco/${name}`);
+    scenarios[name].rows   = (data || []).map(r => ({ ...r, id: nextId++ }));
+    scenarios[name].loaded = true;
+  } catch {
+    scenarios[name].rows   = [];
+    scenarios[name].loaded = true;
+  }
+}
+
+// ── Save ──────────────────────────────────────────────────────────────────────
+
+function scheduleScenarioSave() {
+  if (!currentClientId || activeScenario === 'optimised') return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveScenario, 800);
+}
+
+function snapshot() {
+  if (activeScenario === 'optimised') return;
+  scenarios[activeScenario].rows.forEach(r => {
+    const el = document.getElementById(`row-${r.id}`);
+    if (!el) return;
+    r.label       = el.querySelector('.r-device')?.value    || '';
+    r.brand       = el.querySelector('.r-brand')?.value     || '';
+    r.model       = el.querySelector('.r-model')?.value     || '';
+    r.serial      = el.querySelector('.r-serial')?.value.trim() || '';
+    r.mono_vol    = parseFloat(el.querySelector('.r-mono-vol')?.value)    || 0;
+    r.colour_vol  = parseFloat(el.querySelector('.r-colour-vol')?.value)  || 0;
+    r.mono_rate   = parseFloat(el.querySelector('.r-mono-rate')?.value)   || 0;
+    r.colour_rate = parseFloat(el.querySelector('.r-colour-rate')?.value) || 0;
+    r.rental      = parseFloat(el.querySelector('.r-rental')?.value)      || 0;
+    r.period      = el.querySelector('.r-period')?.value || '';
+  });
+}
+
+async function saveScenario() {
+  if (!currentClientId || activeScenario === 'optimised') return;
+  snapshot();
+  const name = activeScenario;
+  const payload = scenarios[name].rows.map(r => ({
+    device_id:   r.device_id   || null,
+    label:       r.label       || '',
+    location:    r.location    || '',
+    brand:       r.brand       || '',
+    model:       r.model       || '',
+    serial:      r.serial      || '',
+    mono_vol:    r.mono_vol    || 0,
+    colour_vol:  r.colour_vol  || 0,
+    mono_rate:   r.mono_rate   || null,
+    colour_rate: r.colour_rate || null,
+    rental:      r.rental      || null,
+    period:      r.period      || null,
+  }));
+  setSyncStatus('saving', '↑ Saving…');
+  try {
+    await api('PUT', `/clients/${currentClientId}/tco/${name}`, payload);
+    setSyncStatus('saved', '✓ Saved');
+    setTimeout(() => setSyncStatus('', ''), 2000);
+  } catch {
+    setSyncStatus('error', '✗ Save failed');
+  }
 }
 
 // ── Rows ──────────────────────────────────────────────────────────────────────
 
-let rows  = [];
-let nextId = 1;
-
-function addRow(data = {}) {
-  rows.push({ id: nextId++, device_name:'', location:'', brand:'', model:'', serial:'', mono_vol:0, colour_vol:0, mono_rate:0, colour_rate:0, rental:0, period:'', ...data });
+function addRow() {
+  if (activeScenario === 'optimised') return;
+  scenarios[activeScenario].rows.push({
+    id: nextId++, device_id: null,
+    label: '', location: '', brand: '', model: '', serial: '',
+    mono_vol: 0, colour_vol: 0, mono_rate: 0, colour_rate: 0, rental: 0, period: '',
+  });
   renderRows();
-  const last = document.querySelector(`#tco-body tr:last-child .r-device`);
+  const last = document.querySelector('#tco-body tr:last-child .r-device');
   if (last) last.focus();
 }
 
 function removeRow(id) {
-  rows = rows.filter(r => r.id !== id);
+  const arr = scenarios[activeScenario].rows;
+  const idx = arr.findIndex(r => r.id === id);
+  if (idx !== -1) arr.splice(idx, 1);
   renderRows();
-}
-
-function getRowData(id) {
-  const el = document.getElementById(`row-${id}`);
-  if (!el) return null;
-  return {
-    device_name: el.querySelector('.r-device').value,
-    brand:       el.querySelector('.r-brand').value,
-    model:       el.querySelector('.r-model').value,
-    serial:      el.querySelector('.r-serial').value.trim(),
-    mono_vol:    parseFloat(el.querySelector('.r-mono-vol').value)    || 0,
-    colour_vol:  parseFloat(el.querySelector('.r-colour-vol').value)  || 0,
-    mono_rate:   parseFloat(el.querySelector('.r-mono-rate').value)   || 0,
-    colour_rate: parseFloat(el.querySelector('.r-colour-rate').value) || 0,
-    rental:      parseFloat(el.querySelector('.r-rental').value)      || 0,
-    period:      el.querySelector('.r-period').value,
-  };
-}
-
-function calcTco(d) {
-  return (d.mono_vol * d.mono_rate) + (d.colour_vol * d.colour_rate) + (d.rental || 0);
-}
-
-function fmt(n) {
-  return 'R ' + n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  scheduleScenarioSave();
 }
 
 function renderRows() {
-  // Snapshot current DOM values before re-render
-  rows.forEach(r => { const d = getRowData(r.id); if (d) Object.assign(r, d); });
-
+  const rows  = scenarios[activeScenario]?.rows || [];
   const tbody = document.getElementById('tco-body');
   tbody.innerHTML = rows.map((r, i) => {
-    const tco = calcTco(r);
+    const tco      = calcTco(r);
     const tcoClass = tco === 0 ? 'tco-value zero' : 'tco-value';
     return `
     <tr id="row-${r.id}">
       <td class="col-num">${i + 1}</td>
       <td class="col-device">
         <div class="device-name-wrap">
-          <input class="tco-input r-device" type="text" value="${esc(r.device_name)}" placeholder="Device name">
+          <input class="tco-input r-device" type="text" value="${esc(r.label)}" placeholder="Device name">
           ${r.location ? `<div class="device-location" title="${esc(r.location)}">📍 ${esc(r.location)}</div>` : ''}
         </div>
       </td>
@@ -434,34 +548,32 @@ function renderRows() {
         <input class="tco-input r-serial" type="text" value="${esc(r.serial)}" placeholder="optional">
       </td>
       <td class="col-vol">
-        <input class="tco-input r-mono-vol" type="number" min="0" value="${r.mono_vol||''}" placeholder="0" data-id="${r.id}">
+        <input class="tco-input r-mono-vol" type="number" min="0" value="${r.mono_vol || ''}" placeholder="0" data-id="${r.id}">
       </td>
       <td class="col-vol">
-        <input class="tco-input r-colour-vol" type="number" min="0" value="${r.colour_vol||''}" placeholder="0" data-id="${r.id}">
+        <input class="tco-input r-colour-vol" type="number" min="0" value="${r.colour_vol || ''}" placeholder="0" data-id="${r.id}">
       </td>
       <td class="col-rate">
-        <input class="tco-input r-mono-rate" type="number" min="0" step="0.001" value="${r.mono_rate||''}" placeholder="0.000" data-id="${r.id}">
+        <input class="tco-input r-mono-rate" type="number" min="0" step="0.0001" value="${r.mono_rate || ''}" placeholder="0.0000" data-id="${r.id}">
       </td>
       <td class="col-rate">
-        <input class="tco-input r-colour-rate" type="number" min="0" step="0.001" value="${r.colour_rate||''}" placeholder="0.000" data-id="${r.id}">
+        <input class="tco-input r-colour-rate" type="number" min="0" step="0.0001" value="${r.colour_rate || ''}" placeholder="0.0000" data-id="${r.id}">
       </td>
       <td class="col-rental">
-        <input class="tco-input r-rental" type="number" min="0" step="0.01" value="${r.rental||''}" placeholder="0.00" data-id="${r.id}">
+        <input class="tco-input r-rental" type="number" min="0" step="0.01" value="${r.rental || ''}" placeholder="0.00" data-id="${r.id}">
       </td>
       <td class="col-period">
         <select class="tco-input r-period" data-id="${r.id}">
-          <option value=""${!r.period?' selected':''}>No rental</option>
-          <option value="12"${r.period==='12'?' selected':''}>12 mo</option>
-          <option value="24"${r.period==='24'?' selected':''}>24 mo</option>
-          <option value="36"${r.period==='36'?' selected':''}>36 mo</option>
-          <option value="72"${r.period==='72'?' selected':''}>72 mo</option>
-          <option value="Evergreen"${r.period==='Evergreen'?' selected':''}>Evergreen</option>
+          <option value=""${!r.period ? ' selected' : ''}>No rental</option>
+          <option value="12"${r.period === '12' ? ' selected' : ''}>12 mo</option>
+          <option value="24"${r.period === '24' ? ' selected' : ''}>24 mo</option>
+          <option value="36"${r.period === '36' ? ' selected' : ''}>36 mo</option>
+          <option value="72"${r.period === '72' ? ' selected' : ''}>72 mo</option>
+          <option value="Evergreen"${r.period === 'Evergreen' ? ' selected' : ''}>Evergreen</option>
         </select>
       </td>
       <td class="${tcoClass}" id="tco-${r.id}">${fmt(tco)}</td>
-      <td class="col-del">
-        <button class="del-btn" data-id="${r.id}" title="Remove">✕</button>
-      </td>
+      <td class="col-del"><button class="del-btn" data-id="${r.id}" title="Remove">✕</button></td>
     </tr>`;
   }).join('');
 
@@ -473,8 +585,8 @@ function renderRows() {
 function bindRowEvents() {
   document.querySelectorAll('.r-brand').forEach(sel => {
     sel.addEventListener('change', e => {
-      const id = parseInt(e.target.dataset.id);
-      const row = rows.find(r => r.id === id);
+      const id  = parseInt(e.target.dataset.id);
+      const row = scenarios[activeScenario].rows.find(r => r.id === id);
       if (row) { row.brand = e.target.value; row.model = ''; }
       const tr = document.getElementById(`row-${id}`);
       if (tr) tr.querySelector('.r-model').innerHTML = modelOptions(e.target.value, '');
@@ -496,18 +608,13 @@ function bindRowEvents() {
     });
   });
 
-  document.querySelectorAll('.r-mono-vol,.r-colour-vol,.r-mono-rate,.r-colour-rate,.r-rental,.r-model,.r-period').forEach(el => {
+  document.querySelectorAll('.r-mono-vol,.r-colour-vol,.r-mono-rate,.r-colour-rate,.r-rental,.r-period').forEach(el => {
     el.addEventListener('input',  e => { const id = parseInt(e.target.dataset.id); if (id) recalcRow(id); });
     el.addEventListener('change', e => { const id = parseInt(e.target.dataset.id); if (id) recalcRow(id); });
   });
 
-  // Non-numeric fields — sync only, no recalc needed
   document.querySelectorAll('.r-device,.r-serial').forEach(el => {
-    el.addEventListener('input', e => {
-      const tr  = e.target.closest('tr');
-      const id  = tr ? parseInt(tr.id.replace('row-', '')) : null;
-      if (id) scheduleSyncRow(id);
-    });
+    el.addEventListener('input', () => scheduleScenarioSave());
   });
 
   document.querySelectorAll('.del-btn').forEach(btn => {
@@ -516,152 +623,260 @@ function bindRowEvents() {
 }
 
 function recalcRow(id) {
-  const d = getRowData(id);
-  if (!d) return;
-  const tco = calcTco(d);
+  const el = document.getElementById(`row-${id}`);
+  if (!el) return;
+  const d = {
+    mono_vol:    parseFloat(el.querySelector('.r-mono-vol')?.value)    || 0,
+    colour_vol:  parseFloat(el.querySelector('.r-colour-vol')?.value)  || 0,
+    mono_rate:   parseFloat(el.querySelector('.r-mono-rate')?.value)   || 0,
+    colour_rate: parseFloat(el.querySelector('.r-colour-rate')?.value) || 0,
+    rental:      parseFloat(el.querySelector('.r-rental')?.value)      || 0,
+  };
+  const tco  = calcTco(d);
   const cell = document.getElementById(`tco-${id}`);
-  if (cell) {
-    cell.textContent = fmt(tco);
-    cell.className = tco === 0 ? 'tco-value zero' : 'tco-value';
-  }
+  if (cell) { cell.textContent = fmt(tco); cell.className = tco === 0 ? 'tco-value zero' : 'tco-value'; }
   updateTotals();
-  scheduleSyncRow(id);
-}
-
-// ── Sync to database ──────────────────────────────────────────────────────────
-
-const syncTimers = {};
-
-function scheduleSyncRow(rowId) {
-  const row = rows.find(r => r.id === rowId);
-  if (!row?.device_id) return; // manual row — nothing to sync
-  clearTimeout(syncTimers[rowId]);
-  syncTimers[rowId] = setTimeout(() => syncRow(rowId), 600);
-}
-
-function setSyncStatus(state, msg) {
-  const el = document.getElementById('sync-status');
-  el.textContent = msg;
-  el.className   = state;
-}
-
-async function syncRow(rowId) {
-  const row = rows.find(r => r.id === rowId);
-  if (!row?.device_id) return;
-  const d = getRowData(rowId);
-  if (!d) return;
-
-  setSyncStatus('saving', '↑ Saving…');
-  try {
-    const res = await fetch(`/api/devices/${row.device_id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type:           row._orig.type,
-        label:          d.device_name || row._orig.label,
-        brand:          d.brand,
-        model:          d.model,
-        serial:         d.serial,
-        notes:          row._orig.notes,
-        avg_mono:       d.mono_vol    || 0,
-        avg_colour:     d.colour_vol  || 0,
-        mono_rate:      d.mono_rate   || null,
-        colour_rate:    d.colour_rate || null,
-        rental_amount:  d.rental      || null,
-        rental_period:  d.period      || null,
-        x_pct:          row._orig.x_pct,
-        y_pct:          row._orig.y_pct,
-      }),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    setSyncStatus('saved', '✓ Saved');
-    setTimeout(() => setSyncStatus('', ''), 2000);
-  } catch (err) {
-    setSyncStatus('error', '✗ Save failed');
-    console.error('TCO sync error:', err);
-  }
+  scheduleScenarioSave();
 }
 
 function updateTotals() {
-  let totalTco = 0, totalMono = 0, totalColour = 0, totalClicks = 0, totalRental = 0;
+  const rows = scenarios[activeScenario]?.rows || [];
+  let totalMono = 0, totalColour = 0, totalClicks = 0, totalRental = 0, totalTco = 0;
   rows.forEach(r => {
-    const d = getRowData(r.id) || r;
-    totalMono   += d.mono_vol   || 0;
-    totalColour += d.colour_vol || 0;
-    totalClicks += (d.mono_vol * d.mono_rate) + (d.colour_vol * d.colour_rate);
-    totalRental += d.rental     || 0;
+    const el = document.getElementById(`row-${r.id}`);
+    const d = el ? {
+      mono_vol:    parseFloat(el.querySelector('.r-mono-vol')?.value)    || 0,
+      colour_vol:  parseFloat(el.querySelector('.r-colour-vol')?.value)  || 0,
+      mono_rate:   parseFloat(el.querySelector('.r-mono-rate')?.value)   || 0,
+      colour_rate: parseFloat(el.querySelector('.r-colour-rate')?.value) || 0,
+      rental:      parseFloat(el.querySelector('.r-rental')?.value)      || 0,
+    } : r;
+    totalMono   += d.mono_vol    || 0;
+    totalColour += d.colour_vol  || 0;
+    totalClicks += (d.mono_vol || 0) * (d.mono_rate || 0) + (d.colour_vol || 0) * (d.colour_rate || 0);
+    totalRental += d.rental      || 0;
     totalTco    += calcTco(d);
   });
-  document.getElementById('total-tco').textContent    = fmt(totalTco);
-  document.getElementById('sum-devices').textContent  = rows.length;
-  document.getElementById('sum-mono').textContent     = totalMono.toLocaleString('en-ZA');
-  document.getElementById('sum-colour').textContent   = totalColour.toLocaleString('en-ZA');
-  document.getElementById('sum-clicks').textContent   = fmt(totalClicks);
-  document.getElementById('sum-rental').textContent   = fmt(totalRental);
-  document.getElementById('sum-tco').textContent      = fmt(totalTco);
+  document.getElementById('total-tco').textContent   = fmt(totalTco);
+  document.getElementById('sum-devices').textContent = rows.length;
+  document.getElementById('sum-mono').textContent    = totalMono.toLocaleString('en-ZA');
+  document.getElementById('sum-colour').textContent  = totalColour.toLocaleString('en-ZA');
+  document.getElementById('sum-clicks').textContent  = fmt(totalClicks);
+  document.getElementById('sum-rental').textContent  = fmt(totalRental);
+  document.getElementById('sum-tco').textContent     = fmt(totalTco);
   document.getElementById('totals-row').style.display  = rows.length ? '' : 'none';
   document.getElementById('summary-bar').style.display = rows.length ? 'flex' : 'none';
 }
 
 function updateEmptyState() {
-  document.getElementById('empty-hint').classList.toggle('hidden', rows.length > 0);
+  const rows = scenarios[activeScenario]?.rows || [];
+  const hint = document.getElementById('empty-hint');
+  const text = document.getElementById('empty-text');
+  hint.classList.toggle('hidden', rows.length > 0);
+  if (activeScenario === 'current') {
+    text.innerHTML = 'Use <strong>Capture from Fleet</strong> to pull your client\'s devices,<br>or click <strong>+ Add Device</strong> to build the scenario manually.';
+  } else {
+    text.innerHTML = 'Use <strong>Copy from Current State</strong> to start from the current fleet,<br>or click <strong>+ Add Device</strong> to build the scenario manually.';
+  }
+}
+
+// ── Scenario actions ──────────────────────────────────────────────────────────
+
+async function captureFleet() {
+  if (!currentClientId) { toast('Select a client first'); return; }
+  const btn = document.getElementById('capture-btn');
+  if (!btn) return;
+  btn.disabled = true; btn.textContent = 'Capturing…';
+  try {
+    const data = await api('POST', `/clients/${currentClientId}/tco/current/capture-fleet`);
+    scenarios.current.rows   = (data || []).map(r => ({ ...r, id: nextId++ }));
+    scenarios.current.loaded = true;
+    renderRows();
+    toast(`${scenarios.current.rows.length} device${scenarios.current.rows.length !== 1 ? 's' : ''} captured from fleet`);
+  } catch (err) {
+    toast('Error: ' + err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '📥 Capture from Fleet';
+  }
+}
+
+async function copyFromCurrent() {
+  if (!currentClientId) { toast('Select a client first'); return; }
+  const btn = document.getElementById('copy-btn');
+  if (!btn) return;
+  btn.disabled = true; btn.textContent = 'Copying…';
+  try {
+    const data = await api('POST', `/clients/${currentClientId}/tco/future/copy-current`);
+    scenarios.future.rows   = (data || []).map(r => ({ ...r, id: nextId++ }));
+    scenarios.future.loaded = true;
+    renderRows();
+    toast('Future state copied from Current State — edit as needed');
+  } catch (err) {
+    toast('Error: ' + err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '📋 Copy from Current State';
+  }
+}
+
+// ── Optimised ─────────────────────────────────────────────────────────────────
+
+function resetOptimised() {
+  document.getElementById('opt-empty').style.display   = '';
+  document.getElementById('opt-results').style.display = 'none';
+  document.getElementById('opt-results').innerHTML     = '';
+}
+
+async function runOptimiser() {
+  if (!currentClientId) { toast('Select a client first'); return; }
+  const btn = document.getElementById('run-opt-btn');
+  if (!btn) return;
+  btn.disabled = true; btn.textContent = 'Optimising…';
+  const resultsEl = document.getElementById('opt-results');
+  resultsEl.innerHTML = '';
+
+  try {
+    const data = await api('GET', `/clients/${currentClientId}/tco/optimise`);
+    document.getElementById('opt-empty').style.display   = 'none';
+    resultsEl.style.display = '';
+    renderOptimised(data);
+  } catch (err) {
+    document.getElementById('opt-empty').style.display = '';
+    document.getElementById('opt-empty').querySelector('p').innerHTML =
+      `<strong style="color:var(--danger-t)">${err.message}</strong>`;
+    resultsEl.style.display = 'none';
+  } finally {
+    btn.disabled = false; btn.textContent = '⚙ Run Optimiser';
+  }
+}
+
+function renderOptimised(data) {
+  const s = data.summary;
+  const el = document.getElementById('opt-results');
+
+  const savingsPos = s.click_savings > 0;
+
+  el.innerHTML = `
+    <div class="summary-bar">
+      <div class="summary-card">
+        <div class="sc-label">Locations</div>
+        <div class="sc-value">${s.locations}</div>
+      </div>
+      <div class="summary-card">
+        <div class="sc-label">Current Click Charges</div>
+        <div class="sc-value">${fmt(s.curr_clicks)}</div>
+      </div>
+      <div class="summary-card">
+        <div class="sc-label">Optimised Click Cost</div>
+        <div class="sc-value">${fmt(s.opt_clicks)}</div>
+      </div>
+      <div class="summary-card ${savingsPos ? 'savings' : ''}">
+        <div class="sc-label">Click Savings / mo</div>
+        <div class="sc-value">${fmt(s.click_savings)} (${s.savings_pct}%)</div>
+      </div>
+    </div>
+    <p class="opt-note">
+      ⚠ Rental costs are not included in this analysis — they are negotiated separately per deal.
+      Device count per location is held constant from the Current State.
+    </p>
+    <div class="tco-table-wrap" style="margin-top:12px;">
+      <table class="opt-table">
+        <thead>
+          <tr>
+            <th>Location</th>
+            <th style="text-align:right">Devices</th>
+            <th style="text-align:right">Mono Vol</th>
+            <th style="text-align:right">Colour Vol</th>
+            <th style="text-align:right">Curr Clicks</th>
+            <th>Recommended Model</th>
+            <th style="text-align:right">Opt Clicks</th>
+            <th style="text-align:right">Savings</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${data.locations.map(loc => {
+            const rec = loc.recommended;
+            const devInfo = rec
+              ? `<strong>${esc(rec.brand)} ${esc(rec.model)}</strong><br>
+                 <span style="font-size:11px; color:var(--muted)">
+                   M: R${(rec.mono_rate || 0).toFixed(4)}${rec.colour_rate ? ' · C: R' + (rec.colour_rate).toFixed(4) : ''}
+                   · ${rec.colour_type === 'colour' ? 'Colour' : 'Mono'} · ${rec.page_size}
+                 </span>
+                 ${loc.needs_colour && !loc.colour_covered ? '<br><span style="font-size:11px; color:#fb923c">⚠ No colour model in pool — colour pages unaccounted</span>' : ''}`
+              : '<span style="color:var(--muted2)">No eligible model found</span>';
+            const sav = loc.click_savings;
+            const savColor = sav > 0 ? '#4ade80' : (sav < 0 ? 'var(--danger-t)' : 'var(--muted)');
+            return `<tr>
+              <td>${esc(loc.location)}</td>
+              <td style="text-align:right">${loc.device_count}</td>
+              <td style="text-align:right">${(loc.mono_vol || 0).toLocaleString('en-ZA')}</td>
+              <td style="text-align:right">${(loc.colour_vol || 0).toLocaleString('en-ZA')}</td>
+              <td style="text-align:right">${fmt(loc.curr_clicks)}</td>
+              <td>${devInfo}</td>
+              <td style="text-align:right">${loc.opt_clicks != null ? fmt(loc.opt_clicks) : '—'}</td>
+              <td style="text-align:right; font-weight:700; color:${savColor}">${sav != null ? fmt(sav) : '—'}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function showOptimised() {
+  document.getElementById('table-panel').style.display = 'none';
+  document.getElementById('opt-panel').classList.add('active');
+  document.getElementById('header-actions').style.display = 'none';
 }
 
 // ── Export CSV ────────────────────────────────────────────────────────────────
 
 document.getElementById('export-btn').addEventListener('click', () => {
+  snapshot();
+  const rows = scenarios[activeScenario]?.rows || [];
   if (!rows.length) { toast('Nothing to export'); return; }
   const headers = ['#','Device','Location','Brand','Model','Serial No','Mono Vol','Colour Vol','Mono Rate','Colour Rate','Rental','Period','Monthly TCO'];
   const csvRows = [headers.join(',')];
   rows.forEach((r, i) => {
-    const d = getRowData(r.id) || r;
     csvRows.push([
-      i+1,
-      `"${(d.device_name||'').replace(/"/g,'""')}"`,
-      `"${(r.location||'').replace(/"/g,'""')}"`,
-      `"${(d.brand||'').replace(/"/g,'""')}"`,
-      `"${(d.model||'').replace(/"/g,'""')}"`,
-      `"${(d.serial||'').replace(/"/g,'""')}"`,
-      d.mono_vol, d.colour_vol,
-      d.mono_rate, d.colour_rate,
-      d.rental,
-      `"${d.period||'No rental'}"`,
-      calcTco(d).toFixed(2),
+      i + 1,
+      `"${(r.label || '').replace(/"/g, '""')}"`,
+      `"${(r.location || '').replace(/"/g, '""')}"`,
+      `"${(r.brand || '').replace(/"/g, '""')}"`,
+      `"${(r.model || '').replace(/"/g, '""')}"`,
+      `"${(r.serial || '').replace(/"/g, '""')}"`,
+      r.mono_vol, r.colour_vol,
+      r.mono_rate, r.colour_rate,
+      r.rental,
+      `"${r.period || 'No rental'}"`,
+      calcTco(r).toFixed(2),
     ].join(','));
   });
-  const grand = rows.reduce((s,r) => s + calcTco(getRowData(r.id)||r), 0);
-  csvRows.push(['TOTAL','','','','','','','','','','','',grand.toFixed(2)].join(','));
+  const grand = rows.reduce((s, r) => s + calcTco(r), 0);
+  csvRows.push(['TOTAL', '', '', '', '', '', '', '', '', '', '', '', grand.toFixed(2)].join(','));
   const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
-  const a = document.createElement('a');
+  const a    = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `tco-${new Date().toISOString().slice(0,10)}.csv`;
+  a.download = `tco-${activeScenario}-${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   toast('CSV exported');
 });
 
-// ── Toast ─────────────────────────────────────────────────────────────────────
-
-let toastTimer;
-function toast(msg) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
-}
+document.getElementById('add-btn').addEventListener('click', addRow);
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 
-document.getElementById('add-btn').addEventListener('click', () => addRow());
-
-const urlParams   = new URLSearchParams(location.search);
-const urlClientId = parseInt(urlParams.get('client'));
+const urlParams    = new URLSearchParams(location.search);
+const urlClientId  = parseInt(urlParams.get('client'));
 if (urlClientId) document.getElementById('back-btn').href = `/?client=${urlClientId}`;
 
-Promise.all([loadClients(), loadCatalogue()]).then(() => {
+Promise.all([loadClients(), loadCatalogue()]).then(async () => {
+  updateActionBar();
   if (urlClientId) {
+    currentClientId = urlClientId;
     document.getElementById('client-sel').value = urlClientId;
-    loadClientDevices(urlClientId);
+    setStatus('Loading current state…');
+    await loadScenario('current');
+    setStatus('');
+    renderRows();
   } else {
     updateEmptyState();
   }

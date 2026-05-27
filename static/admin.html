@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Device Catalogue — Asset Planner</title>
+  <title>Admin — Asset Planner</title>
   <link rel="stylesheet" href="style.css">
   <style>
     body { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
@@ -11,9 +11,27 @@
       display: flex; align-items: center; gap: 12px; flex-shrink: 0;
     }
     header h1 { font-size: 17px; font-weight: 600; }
-    .body { display: flex; flex: 1; overflow: hidden; }
 
-    /* ── Left: catalogue ── */
+    /* ── Top tab bar ── */
+    #top-tabs {
+      display: flex; background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 0 20px; flex-shrink: 0;
+    }
+    .ttab {
+      padding: 12px 20px; font-size: 13px; font-weight: 500; color: var(--muted);
+      cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
+      transition: color 0.15s, border-color 0.15s; user-select: none;
+    }
+    .ttab:hover { color: var(--text); }
+    .ttab.active { color: var(--text); border-bottom-color: var(--accent); }
+
+    /* ── Tab panes ── */
+    .tab-pane { flex: 1; overflow: hidden; display: none; }
+    .tab-pane.active { display: flex; }
+
+    /* ── Catalogue pane: left list + right editor ── */
+    #catalogue-pane { flex-direction: row; }
+
     #catalogue-panel {
       width: 520px; min-width: 340px; background: var(--surface);
       border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden;
@@ -47,7 +65,6 @@
     .model-row.selected { background: rgba(59,130,246,0.12); }
     .model-name { flex: 1; font-size: 13px; color: var(--text); }
 
-    /* Classification badges */
     .badge-type { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 10px; white-space: nowrap; }
     .badge-type.colour { background: rgba(59,130,246,0.2); color: #93c5fd; }
     .badge-type.mono   { background: rgba(107,114,128,0.2); color: var(--muted); }
@@ -59,9 +76,7 @@
     .model-del { opacity: 0; transition: opacity 0.15s; flex-shrink: 0; }
     .model-row:hover .model-del { opacity: 1; }
 
-    .add-model-form {
-      display: none; padding: 6px 16px 8px 42px; gap: 6px;
-    }
+    .add-model-form { display: none; padding: 6px 16px 8px 42px; gap: 6px; }
     .add-model-form.open { display: flex; align-items: center; }
     .add-model-form .input { flex: 1; font-size: 12px; padding: 5px 8px; }
 
@@ -70,9 +85,12 @@
     }
     .empty-catalogue .big { font-size: 48px; opacity: 0.3; display: block; margin-bottom: 12px; }
 
-    /* ── Right: editor panel ── */
-    #right-panel { flex: 1; padding: 28px 32px; overflow-y: auto; }
-    #right-panel h2 { font-size: 14px; color: var(--muted); margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.07em; }
+    /* ── Catalogue right editor ── */
+    #catalogue-editor { flex: 1; padding: 28px 32px; overflow-y: auto; }
+    #catalogue-editor h2 {
+      font-size: 14px; color: var(--muted); margin-bottom: 16px;
+      text-transform: uppercase; letter-spacing: 0.07em;
+    }
 
     .editor-card {
       background: var(--surface); border: 1px solid var(--border2); border-radius: 10px;
@@ -81,7 +99,6 @@
     .editor-card .modal-field { margin-bottom: 14px; }
     .editor-card label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 6px; }
 
-    /* Segmented control */
     .seg-control { display: flex; gap: 0; border-radius: 6px; overflow: hidden; border: 1px solid var(--border2); width: fit-content; }
     .seg-control input[type="radio"] { display: none; }
     .seg-control label {
@@ -93,7 +110,6 @@
     .seg-control input[type="radio"]:checked + label { background: var(--accent-h); color: #fff; }
 
     .rate-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-
     #colour-rate-field { transition: opacity 0.2s; }
     #colour-rate-field.dimmed { opacity: 0.35; pointer-events: none; }
 
@@ -104,15 +120,12 @@
     .add-brand-card label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 6px; }
     .add-brand-row { display: flex; gap: 8px; }
 
-    #toast {
-      position: fixed; bottom: 24px; left: 50%;
-      transform: translateX(-50%) translateY(80px);
-      background: var(--surface2); border: 1px solid var(--border2);
-      border-radius: 8px; padding: 10px 18px; font-size: 13px; color: var(--text);
-      box-shadow: 0 4px 16px rgba(0,0,0,0.4); transition: transform 0.25s ease;
-      z-index: 9999; white-space: nowrap;
+    /* ── Import / Rates panes ── */
+    #import-pane, #rates-pane { flex-direction: column; padding: 28px 32px; overflow-y: auto; }
+    #import-pane h2, #rates-pane h2 {
+      font-size: 14px; color: var(--muted); margin-bottom: 16px;
+      text-transform: uppercase; letter-spacing: 0.07em;
     }
-    #toast.show { transform: translateX(-50%) translateY(0); }
 
     .import-card {
       background: var(--surface); border: 1px solid var(--border2); border-radius: 10px;
@@ -129,19 +142,36 @@
     #import-result .err-table th { text-align: left; padding: 4px 8px; color: var(--muted); font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.08); }
     #import-result .err-table td { padding: 5px 8px; border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: top; }
     #import-result .err-table tr:last-child td { border-bottom: none; }
+
+    #toast {
+      position: fixed; bottom: 24px; left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--surface2); border: 1px solid var(--border2);
+      border-radius: 8px; padding: 10px 18px; font-size: 13px; color: var(--text);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4); transition: transform 0.25s ease;
+      z-index: 9999; white-space: nowrap;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
   </style>
 </head>
 <body>
 
 <header>
   <a href="/" class="btn btn-neutral btn-sm" style="text-decoration:none">← Dashboard</a>
-  <h1>🗂 Device Catalogue</h1>
-  <span style="font-size:12px; color:var(--muted)">Manage brands and models — set classification and standard pricing</span>
+  <h1>⚙️ Admin</h1>
+  <span style="font-size:12px; color:var(--muted)">Catalogue, fleet import, and pricing management</span>
 </header>
 
-<div class="body">
+<div id="top-tabs">
+  <div class="ttab active" id="tab-catalogue" onclick="switchTab('catalogue')">Catalogue</div>
+  <div class="ttab" id="tab-import"    onclick="switchTab('import')">Fleet Import</div>
+  <div class="ttab" id="tab-rates"     onclick="switchTab('rates')">Rates</div>
+</div>
 
-  <!-- Left: catalogue list -->
+<!-- ── Catalogue pane ── -->
+<div id="catalogue-pane" class="tab-pane active">
+
+  <!-- Left: brand/model list -->
   <div id="catalogue-panel">
     <div id="catalogue-header">
       <span class="section-label">Brands &amp; Models</span>
@@ -153,9 +183,9 @@
   </div>
 
   <!-- Right: editor / add brand -->
-  <div id="right-panel">
+  <div id="catalogue-editor">
 
-    <!-- Model editor (shown when model selected) -->
+    <!-- Model editor (shown when a model is selected) -->
     <div id="model-editor" style="display:none">
       <h2 id="editor-title">Edit Model</h2>
       <div class="editor-card">
@@ -194,6 +224,13 @@
             </div>
           </div>
         </div>
+        <div class="modal-field">
+          <label>Optimisation Pool</label>
+          <div style="display:flex; align-items:center; gap:8px; padding:6px 0;">
+            <input type="checkbox" id="ed-optimiser-allowed" style="width:16px; height:16px; accent-color:var(--accent); cursor:pointer;">
+            <span style="font-size:13px; color:var(--muted)">Available for optimised fleet building</span>
+          </div>
+        </div>
         <div style="display:flex; gap:8px; margin-top:6px;">
           <button class="btn btn-primary" id="ed-save">Save Changes</button>
           <button class="btn btn-neutral" id="ed-cancel">Cancel</button>
@@ -201,7 +238,7 @@
       </div>
     </div>
 
-    <!-- Add brand (default) -->
+    <!-- Default: add brand -->
     <div id="add-brand-section">
       <h2>Add Brand</h2>
       <div class="add-brand-card">
@@ -219,24 +256,35 @@
       </div>
     </div>
 
-    <!-- Fleet Import -->
-    <div id="fleet-import-section">
-      <h2>Fleet Import</h2>
-      <div class="import-card">
-        <p>
-          Upload a CSV to bulk-import devices across all locations.<br>
-          Clients must already exist. Cities, buildings, and floors are created automatically.<br>
-          Any serial number conflict or unknown client stops the entire import.
-        </p>
-        <button class="btn btn-neutral" onclick="downloadTemplate()">⬇ Download Template</button>
-        <div class="import-upload-row">
-          <input type="file" id="import-file" accept=".csv">
-          <button class="btn btn-primary" id="import-btn" disabled onclick="runImport()">Import Devices</button>
-        </div>
-        <div id="import-result" style="display:none"></div>
-      </div>
-    </div>
+  </div>
+</div>
 
+<!-- ── Fleet Import pane ── -->
+<div id="import-pane" class="tab-pane">
+  <h2>Fleet Import</h2>
+  <div class="import-card">
+    <p>
+      Upload a CSV to bulk-import devices across all locations.<br>
+      Clients must already exist. Cities, buildings, and floors are created automatically.<br>
+      Any serial number conflict or unknown client stops the entire import.
+    </p>
+    <button class="btn btn-neutral" onclick="downloadTemplate()">⬇ Download Template</button>
+    <div class="import-upload-row">
+      <input type="file" id="import-file" accept=".csv">
+      <button class="btn btn-primary" id="import-btn" disabled onclick="runImport()">Import Devices</button>
+    </div>
+    <div id="import-result" style="display:none"></div>
+  </div>
+</div>
+
+<!-- ── Rates pane ── -->
+<div id="rates-pane" class="tab-pane">
+  <h2>Rates &amp; Pricing</h2>
+  <div class="import-card">
+    <p>
+      Standard CPC rates, dealer rates, and distance surcharges will be managed here.<br>
+      This section is a placeholder — pricing tools coming soon.
+    </p>
   </div>
 </div>
 
@@ -244,7 +292,16 @@
 
 <script>
 let catalogue = [];
-let selectedModel = null; // { model, brand }
+let selectedModel = null;
+let activeTab = 'catalogue';
+
+function switchTab(tab) {
+  activeTab = tab;
+  ['catalogue', 'import', 'rates'].forEach(t => {
+    document.getElementById('tab-' + t).classList.toggle('active', tab === t);
+    document.getElementById(t + '-pane').classList.toggle('active', tab === t);
+  });
+}
 
 async function api(method, path, body) {
   const opts = { method, headers: {} };
@@ -287,7 +344,6 @@ function render() {
     const block = document.createElement('div');
     block.className = 'brand-block';
 
-    // Brand row
     const row = document.createElement('div');
     row.className = 'brand-row';
 
@@ -341,7 +397,6 @@ function render() {
       toggle.classList.toggle('open', isOpen);
     });
 
-    // Model list
     const modelList = document.createElement('div');
     modelList.className = 'model-list open';
 
@@ -354,19 +409,16 @@ function render() {
       mName.className = 'model-name';
       mName.textContent = model.name;
 
-      // Colour type badge
       const typeBadge = document.createElement('span');
       const ct = model.colour_type || 'mono';
       typeBadge.className = `badge-type ${ct}`;
       typeBadge.textContent = ct === 'colour' ? 'Colour' : 'Mono';
 
-      // Page size badge
       const sizeBadge = document.createElement('span');
       const ps = model.page_size || 'A4';
       sizeBadge.className = `badge-size ${ps.toLowerCase()}`;
       sizeBadge.textContent = ps;
 
-      // Rate chips
       const rateEl = document.createElement('span');
       rateEl.className = 'model-rate';
       const parts = [];
@@ -387,17 +439,34 @@ function render() {
         load();
       };
 
+      const optEl = document.createElement('span');
+      optEl.title = model.optimiser_allowed ? 'In optimisation pool — click to remove' : 'Not in optimisation pool — click to add';
+      optEl.textContent = model.optimiser_allowed ? '⊙' : '○';
+      optEl.style.cssText = `font-size:14px; cursor:pointer; flex-shrink:0; color:${model.optimiser_allowed ? 'var(--accent)' : 'var(--muted2)'}; transition:color 0.15s;`;
+      optEl.onclick = async e => {
+        e.stopPropagation();
+        const newVal = !model.optimiser_allowed;
+        await api('PUT', `/models/${model.id}`, {
+          name: model.name, colour_type: model.colour_type, page_size: model.page_size,
+          mono_rate: model.mono_rate, colour_rate: model.colour_rate, optimiser_allowed: newVal,
+        });
+        model.optimiser_allowed = newVal;
+        optEl.textContent = newVal ? '⊙' : '○';
+        optEl.style.color = newVal ? 'var(--accent)' : 'var(--muted2)';
+        optEl.title = newVal ? 'In optimisation pool — click to remove' : 'Not in optimisation pool — click to add';
+        toast(`"${model.name}" ${newVal ? 'added to' : 'removed from'} optimisation pool`);
+      };
+
       mRow.appendChild(mName);
       mRow.appendChild(typeBadge);
       mRow.appendChild(sizeBadge);
       mRow.appendChild(rateEl);
+      mRow.appendChild(optEl);
       mRow.appendChild(mDel);
-
       mRow.addEventListener('click', () => openEditor(model, brand));
       modelList.appendChild(mRow);
     });
 
-    // Add model form
     const addModelForm = document.createElement('div');
     addModelForm.className = 'add-model-form';
 
@@ -405,7 +474,7 @@ function render() {
     mInput.type = 'text'; mInput.className = 'input';
     mInput.placeholder = 'Model name, e.g. LaserJet Pro M404n';
 
-    const mAddBtn    = document.createElement('button');
+    const mAddBtn = document.createElement('button');
     mAddBtn.className = 'btn btn-primary btn-sm';
     mAddBtn.textContent = 'Add';
 
@@ -447,32 +516,27 @@ function openEditor(model, brand) {
   selectedModel = { model, brand };
   document.getElementById('model-editor').style.display = 'block';
   document.getElementById('add-brand-section').style.display = 'none';
-  document.getElementById('fleet-import-section').style.display = 'none';
   document.getElementById('editor-title').textContent = `✏️ ${brand.name} — ${model.name}`;
   document.getElementById('ed-name').value = model.name;
 
-  // Colour type
   document.querySelector(`input[name="ed-colour-type"][value="${model.colour_type || 'mono'}"]`).checked = true;
   updateColourRateVisibility(model.colour_type || 'mono');
-
-  // Page size
   document.querySelector(`input[name="ed-page-size"][value="${model.page_size || 'A4'}"]`).checked = true;
 
-  // Rates
-  document.getElementById('ed-mono-rate').value   = model.mono_rate   != null ? model.mono_rate   : '';
-  document.getElementById('ed-colour-rate').value = model.colour_rate != null ? model.colour_rate : '';
+  document.getElementById('ed-mono-rate').value        = model.mono_rate        != null ? model.mono_rate        : '';
+  document.getElementById('ed-colour-rate').value      = model.colour_rate      != null ? model.colour_rate      : '';
+  document.getElementById('ed-optimiser-allowed').checked = !!model.optimiser_allowed;
 
-  // Highlight selected row
   document.querySelectorAll('.model-row').forEach(r => r.classList.remove('selected'));
-  const rows = document.querySelectorAll('.model-row');
-  rows.forEach(r => { if (r.querySelector('.model-name')?.textContent === model.name) r.classList.add('selected'); });
+  document.querySelectorAll('.model-row').forEach(r => {
+    if (r.querySelector('.model-name')?.textContent === model.name) r.classList.add('selected');
+  });
 }
 
 function closeEditor() {
   selectedModel = null;
   document.getElementById('model-editor').style.display = 'none';
   document.getElementById('add-brand-section').style.display = 'block';
-  document.getElementById('fleet-import-section').style.display = 'block';
   document.querySelectorAll('.model-row').forEach(r => r.classList.remove('selected'));
 }
 
@@ -490,14 +554,15 @@ document.getElementById('ed-save').addEventListener('click', async () => {
   const colour_type = document.querySelector('input[name="ed-colour-type"]:checked').value;
   const page_size   = document.querySelector('input[name="ed-page-size"]:checked').value;
   const mono_rate   = parseFloat(document.getElementById('ed-mono-rate').value)   || null;
-  const colour_rate = colour_type === 'colour'
+  const colour_rate       = colour_type === 'colour'
     ? parseFloat(document.getElementById('ed-colour-rate').value) || null
     : null;
+  const optimiser_allowed = document.getElementById('ed-optimiser-allowed').checked;
 
   if (!name) { toast('Name is required'); return; }
 
   try {
-    await api('PUT', `/models/${selectedModel.model.id}`, { name, colour_type, page_size, mono_rate, colour_rate });
+    await api('PUT', `/models/${selectedModel.model.id}`, { name, colour_type, page_size, mono_rate, colour_rate, optimiser_allowed });
     toast(`"${name}" saved`);
     closeEditor();
     load();

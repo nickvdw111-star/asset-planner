@@ -76,6 +76,30 @@ def init_db():
                 brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
                 name     TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS tco_scenarios (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_id  INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+                scenario   TEXT NOT NULL CHECK(scenario IN ('current','future')),
+                updated_at TEXT DEFAULT (datetime('now')),
+                UNIQUE(client_id, scenario)
+            );
+            CREATE TABLE IF NOT EXISTS tco_scenario_rows (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                scenario_id INTEGER NOT NULL REFERENCES tco_scenarios(id) ON DELETE CASCADE,
+                sort_order  INTEGER NOT NULL DEFAULT 0,
+                device_id   TEXT,
+                label       TEXT NOT NULL DEFAULT '',
+                location    TEXT NOT NULL DEFAULT '',
+                brand       TEXT NOT NULL DEFAULT '',
+                model       TEXT NOT NULL DEFAULT '',
+                serial      TEXT NOT NULL DEFAULT '',
+                mono_vol    INTEGER NOT NULL DEFAULT 0,
+                colour_vol  INTEGER NOT NULL DEFAULT 0,
+                mono_rate   REAL,
+                colour_rate REAL,
+                rental      REAL,
+                period      TEXT
+            );
         ''')
         # Migrate existing databases
         mcols = [r[1] for r in db.execute('PRAGMA table_info(models)').fetchall()]
@@ -87,6 +111,8 @@ def init_db():
             db.execute('ALTER TABLE models ADD COLUMN mono_rate REAL')
         if 'colour_rate' not in mcols:
             db.execute('ALTER TABLE models ADD COLUMN colour_rate REAL')
+        if 'optimiser_allowed' not in mcols:
+            db.execute('ALTER TABLE models ADD COLUMN optimiser_allowed INTEGER NOT NULL DEFAULT 0')
 
         cols = [r[1] for r in db.execute('PRAGMA table_info(devices)').fetchall()]
         if 'avg_mono' not in cols:
@@ -400,14 +426,15 @@ def update_model(model_id):
     name = d.get('name', '').strip()
     if not name:
         return jsonify({'error': 'name required'}), 400
-    colour_type = d.get('colour_type', 'mono')
-    page_size   = d.get('page_size', 'A4')
-    mono_rate   = d.get('mono_rate') or None
-    colour_rate = d.get('colour_rate') or None
+    colour_type       = d.get('colour_type', 'mono')
+    page_size         = d.get('page_size', 'A4')
+    mono_rate         = d.get('mono_rate') or None
+    colour_rate       = d.get('colour_rate') or None
+    optimiser_allowed = 1 if d.get('optimiser_allowed') else 0
     with get_db() as db:
         db.execute(
-            'UPDATE models SET name=?, colour_type=?, page_size=?, mono_rate=?, colour_rate=? WHERE id=?',
-            (name, colour_type, page_size, mono_rate, colour_rate, model_id)
+            'UPDATE models SET name=?, colour_type=?, page_size=?, mono_rate=?, colour_rate=?, optimiser_allowed=? WHERE id=?',
+            (name, colour_type, page_size, mono_rate, colour_rate, optimiser_allowed, model_id)
         )
         row = db.execute('SELECT * FROM models WHERE id = ?', (model_id,)).fetchone()
     return jsonify(dict(row))
@@ -1078,6 +1105,229 @@ def import_devices():
             imported += 1
 
     return jsonify({'status': 'success', 'imported': imported, 'created': counts})
+
+
+# ── TCO Scenarios ─────────────────────────────────────────────────────────────
+
+def _get_or_create_scenario(db, client_id, scenario):
+    row = db.execute(
+        'SELECT id FROM tco_scenarios WHERE client_id=? AND scenario=?', (client_id, scenario)
+    ).fetchone()
+    if row:
+        return row['id']
+    cur = db.execute(
+        'INSERT INTO tco_scenarios (client_id, scenario) VALUES (?,?)', (client_id, scenario)
+    )
+    return cur.lastrowid
+
+def _scenario_rows(db, scenario_id):
+    return [dict(r) for r in db.execute(
+        'SELECT * FROM tco_scenario_rows WHERE scenario_id=? ORDER BY sort_order, id',
+        (scenario_id,)
+    ).fetchall()]
+
+def _safe_f(v):
+    try: return float(v) if v not in (None, '') else None
+    except: return None
+
+def _safe_i(v):
+    try: return int(float(v)) if v not in (None, '') else 0
+    except: return 0
+
+@app.route('/api/clients/<int:cid>/tco/current/capture-fleet', methods=['POST'])
+def capture_fleet(cid):
+    with get_db() as db:
+        devices = db.execute('''
+            SELECT d.*,
+                   b.name  AS building_name,
+                   f.label AS floor_label,
+                   ci.name AS city_name
+            FROM devices d
+            JOIN floors    f  ON f.id  = d.floor_id
+            JOIN buildings b  ON b.id  = f.building_id
+            JOIN cities    ci ON ci.id = b.city_id
+            WHERE ci.client_id = ?
+            ORDER BY ci.name, b.name, f.level, d.label
+        ''', (cid,)).fetchall()
+        sc_id = _get_or_create_scenario(db, cid, 'current')
+        db.execute('UPDATE tco_scenarios SET updated_at=datetime("now") WHERE id=?', (sc_id,))
+        db.execute('DELETE FROM tco_scenario_rows WHERE scenario_id=?', (sc_id,))
+        for i, d in enumerate(devices):
+            db.execute('''
+                INSERT INTO tco_scenario_rows
+                    (scenario_id, sort_order, device_id, label, location,
+                     brand, model, serial, mono_vol, colour_vol,
+                     mono_rate, colour_rate, rental, period)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ''', (
+                sc_id, i, d['id'],
+                d['label'] or '',
+                f"{d['building_name']} · {d['floor_label']}",
+                d['brand'] or '', d['model'] or '', d['serial'] or '',
+                d['avg_mono'] or 0, d['avg_colour'] or 0,
+                d['mono_rate'], d['colour_rate'],
+                d['rental_amount'], d['rental_period'],
+            ))
+        return jsonify(_scenario_rows(db, sc_id))
+
+@app.route('/api/clients/<int:cid>/tco/future/copy-current', methods=['POST'])
+def copy_current_to_future(cid):
+    with get_db() as db:
+        sc_curr = db.execute(
+            'SELECT id FROM tco_scenarios WHERE client_id=? AND scenario="current"', (cid,)
+        ).fetchone()
+        if not sc_curr:
+            return jsonify({'error': 'No current state to copy from'}), 404
+        curr_rows = _scenario_rows(db, sc_curr['id'])
+        sc_id = _get_or_create_scenario(db, cid, 'future')
+        db.execute('UPDATE tco_scenarios SET updated_at=datetime("now") WHERE id=?', (sc_id,))
+        db.execute('DELETE FROM tco_scenario_rows WHERE scenario_id=?', (sc_id,))
+        for r in curr_rows:
+            db.execute('''
+                INSERT INTO tco_scenario_rows
+                    (scenario_id, sort_order, device_id, label, location,
+                     brand, model, serial, mono_vol, colour_vol,
+                     mono_rate, colour_rate, rental, period)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ''', (
+                sc_id, r['sort_order'], r.get('device_id'),
+                r['label'], r['location'], r['brand'], r['model'], r['serial'],
+                r['mono_vol'], r['colour_vol'],
+                r['mono_rate'], r['colour_rate'], r['rental'], r['period'],
+            ))
+        return jsonify(_scenario_rows(db, sc_id))
+
+@app.route('/api/clients/<int:cid>/tco/optimise', methods=['GET'])
+def optimise_fleet(cid):
+    from collections import defaultdict
+    with get_db() as db:
+        sc = db.execute(
+            'SELECT id FROM tco_scenarios WHERE client_id=? AND scenario="current"', (cid,)
+        ).fetchone()
+        if not sc:
+            return jsonify({'error': 'Capture the fleet into Current State first.'}), 404
+        curr_rows = _scenario_rows(db, sc['id'])
+        if not curr_rows:
+            return jsonify({'error': 'Current State is empty — add devices first.'}), 404
+        allowed = [dict(m) for m in db.execute('''
+            SELECT m.*, b.name AS brand_name
+            FROM models m
+            JOIN brands b ON b.id = m.brand_id
+            WHERE m.optimiser_allowed = 1 AND m.mono_rate IS NOT NULL
+        ''').fetchall()]
+
+    if not allowed:
+        return jsonify({'error': 'No devices in the optimisation pool. Tick models in Admin → Catalogue.'}), 404
+
+    colour_pool = [m for m in allowed if m['colour_type'] == 'colour' and m['colour_rate'] is not None]
+    groups = defaultdict(list)
+    for r in curr_rows:
+        groups[r['location'] or 'Unspecified'].append(r)
+
+    results = []
+    total_curr_clicks = 0.0
+    total_opt_clicks  = 0.0
+
+    for location, devices in groups.items():
+        n           = len(devices)
+        mono_vol    = sum(d['mono_vol']   or 0 for d in devices)
+        colour_vol  = sum(d['colour_vol'] or 0 for d in devices)
+        curr_clicks = sum((d['mono_vol']   or 0) * (d['mono_rate']   or 0) +
+                         (d['colour_vol'] or 0) * (d['colour_rate'] or 0)
+                         for d in devices)
+        curr_rental = sum(d['rental'] or 0 for d in devices)
+        needs_colour = colour_vol > 0
+        pool = colour_pool if (needs_colour and colour_pool) else allowed
+
+        best = None
+        best_clicks = float('inf')
+        for m in pool:
+            c = mono_vol * (m['mono_rate'] or 0) + colour_vol * (m['colour_rate'] or 0)
+            if c < best_clicks:
+                best_clicks = c
+                best = m
+
+        results.append({
+            'location':      location,
+            'device_count':  n,
+            'mono_vol':      mono_vol,
+            'colour_vol':    colour_vol,
+            'curr_clicks':   round(curr_clicks, 2),
+            'curr_rental':   round(curr_rental, 2),
+            'opt_clicks':    round(best_clicks, 2) if best else None,
+            'click_savings': round(curr_clicks - best_clicks, 2) if best else None,
+            'needs_colour':  needs_colour,
+            'colour_covered': bool(best and best['colour_type'] == 'colour') if needs_colour else True,
+            'recommended':   {
+                'brand':       best['brand_name'],
+                'model':       best['name'],
+                'colour_type': best['colour_type'],
+                'page_size':   best['page_size'],
+                'mono_rate':   best['mono_rate'],
+                'colour_rate': best['colour_rate'],
+            } if best else None,
+        })
+        total_curr_clicks += curr_clicks
+        total_opt_clicks  += (best_clicks if best else curr_clicks)
+
+    return jsonify({
+        'summary': {
+            'locations':     len(results),
+            'curr_clicks':   round(total_curr_clicks, 2),
+            'opt_clicks':    round(total_opt_clicks, 2),
+            'click_savings': round(total_curr_clicks - total_opt_clicks, 2),
+            'savings_pct':   round((total_curr_clicks - total_opt_clicks) / total_curr_clicks * 100, 1)
+                             if total_curr_clicks else 0,
+        },
+        'locations': results,
+    })
+
+@app.route('/api/clients/<int:cid>/tco/<scenario>', methods=['GET'])
+def get_tco_scenario(cid, scenario):
+    if scenario not in ('current', 'future'):
+        abort(404)
+    with get_db() as db:
+        sc = db.execute(
+            'SELECT id FROM tco_scenarios WHERE client_id=? AND scenario=?', (cid, scenario)
+        ).fetchone()
+        if not sc:
+            return jsonify([])
+        return jsonify(_scenario_rows(db, sc['id']))
+
+@app.route('/api/clients/<int:cid>/tco/<scenario>', methods=['PUT'])
+def save_tco_scenario(cid, scenario):
+    if scenario not in ('current', 'future'):
+        abort(404)
+    rows_data = request.json
+    if not isinstance(rows_data, list):
+        return jsonify({'error': 'expected array'}), 400
+    with get_db() as db:
+        sc_id = _get_or_create_scenario(db, cid, scenario)
+        db.execute('UPDATE tco_scenarios SET updated_at=datetime("now") WHERE id=?', (sc_id,))
+        db.execute('DELETE FROM tco_scenario_rows WHERE scenario_id=?', (sc_id,))
+        for i, row in enumerate(rows_data):
+            db.execute('''
+                INSERT INTO tco_scenario_rows
+                    (scenario_id, sort_order, device_id, label, location,
+                     brand, model, serial, mono_vol, colour_vol,
+                     mono_rate, colour_rate, rental, period)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ''', (
+                sc_id, i,
+                row.get('device_id') or None,
+                row.get('label') or '',
+                row.get('location') or '',
+                row.get('brand') or '',
+                row.get('model') or '',
+                row.get('serial') or '',
+                _safe_i(row.get('mono_vol')),
+                _safe_i(row.get('colour_vol')),
+                _safe_f(row.get('mono_rate')),
+                _safe_f(row.get('colour_rate')),
+                _safe_f(row.get('rental')),
+                row.get('period') or None,
+            ))
+    return jsonify({'status': 'ok'})
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

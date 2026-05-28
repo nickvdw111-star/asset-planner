@@ -371,6 +371,23 @@
       </div>
     </div>
     <div class="modal-field">
+      <label>Device Type</label>
+      <select class="input" id="dm-type">
+        <option value="printer">Printer</option>
+        <option value="mfp">MFP (Multifunction)</option>
+        <option value="scanner">Scanner</option>
+        <option value="print_server">Print Server</option>
+      </select>
+    </div>
+    <div class="modal-field">
+      <label>Location</label>
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <select class="input" id="dm-city"><option value="">— Select city —</option></select>
+        <select class="input" id="dm-building"><option value="">— Select building —</option></select>
+        <select class="input" id="dm-floor"><option value="">— Select floor —</option></select>
+      </div>
+    </div>
+    <div class="modal-field">
       <label>Serial Number</label>
       <input type="text" class="input" id="dm-serial" placeholder="e.g. VND3X12345">
     </div>
@@ -1147,6 +1164,17 @@ document.getElementById('dm-brand').addEventListener('change', e => {
   document.getElementById('dm-model-add-row').classList.remove('open');
 });
 
+document.getElementById('dm-city').addEventListener('change', e => {
+  const cityId = parseInt(e.target.value);
+  populateDmBuilding(cityId, null);
+  document.getElementById('dm-floor').innerHTML = '';
+});
+
+document.getElementById('dm-building').addEventListener('change', e => {
+  const buildingId = parseInt(e.target.value);
+  populateDmFloor(buildingId, null);
+});
+
 document.getElementById('dm-model').addEventListener('change', e => {
   const brandName = document.getElementById('dm-brand').value;
   const brand = deviceCatalogue.find(b => b.name === brandName);
@@ -1154,6 +1182,7 @@ document.getElementById('dm-model').addEventListener('change', e => {
   if (model) {
     if (model.mono_rate   != null) document.getElementById('dm-mono-rate').value   = model.mono_rate;
     if (model.colour_rate != null) document.getElementById('dm-colour-rate').value = model.colour_rate;
+    if (model.device_type) document.getElementById('dm-type').value = model.device_type;
   }
 });
 
@@ -1161,11 +1190,70 @@ document.getElementById('dm-model').addEventListener('change', e => {
 
 let dmTarget = null; // { device, floorId, container }
 
+function findDeviceLocation(floorId) {
+  if (!activeClient) return null;
+  for (const city of activeClient.cities) {
+    for (const building of city.buildings) {
+      for (const floor of building.floors) {
+        if (floor.id === floorId) return { city, building, floor };
+      }
+    }
+  }
+  return null;
+}
+
+function populateDmCity(selectedCityId) {
+  const sel = document.getElementById('dm-city');
+  sel.innerHTML = '';
+  if (!activeClient) return;
+  activeClient.cities.forEach(c => {
+    const o = document.createElement('option');
+    o.value = c.id; o.textContent = c.name;
+    if (c.id === selectedCityId) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+
+function populateDmBuilding(cityId, selectedBuildingId) {
+  const sel = document.getElementById('dm-building');
+  sel.innerHTML = '';
+  if (!activeClient) return;
+  const city = activeClient.cities.find(c => c.id == cityId);
+  if (!city) return;
+  city.buildings.forEach(b => {
+    const o = document.createElement('option');
+    o.value = b.id; o.textContent = b.name;
+    if (b.id === selectedBuildingId) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+
+function populateDmFloor(buildingId, selectedFloorId) {
+  const sel = document.getElementById('dm-floor');
+  sel.innerHTML = '';
+  if (!activeClient) return;
+  let building = null;
+  for (const city of activeClient.cities) {
+    building = city.buildings.find(b => b.id == buildingId);
+    if (building) break;
+  }
+  if (!building) return;
+  building.floors.forEach(f => {
+    const o = document.createElement('option');
+    o.value = f.id; o.textContent = f.label;
+    if (f.id === selectedFloorId) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+
 function openDeviceModal(device, floorId, container) {
-  dmTarget = { device, floorId, container };
+  const loc = findDeviceLocation(floorId);
+  dmTarget = { device, floorId, container, originalFloorId: floorId };
+
   const icons = DEVICE_ICONS_MAP;
   document.getElementById('dm-title').textContent = `${icons[device.type] || '🖨'} ${device.label || 'Device'}`;
   document.getElementById('dm-label').value         = device.label       || '';
+  document.getElementById('dm-type').value          = device.type        || 'printer';
   document.getElementById('dm-serial').value        = device.serial      || '';
   document.getElementById('dm-mono').value          = device.avg_mono    || '';
   document.getElementById('dm-colour').value        = device.avg_colour  || '';
@@ -1180,6 +1268,13 @@ function openDeviceModal(device, floorId, container) {
   document.getElementById('dm-new-model').value = '';
   populateDmBrand(device.brand || '');
   populateDmModel(device.brand || '', device.model || '');
+
+  if (loc) {
+    populateDmCity(loc.city.id);
+    populateDmBuilding(loc.city.id, loc.building.id);
+    populateDmFloor(loc.building.id, floorId);
+  }
+
   document.getElementById('device-modal').classList.add('open');
   document.getElementById('dm-label').focus();
 }
@@ -1196,9 +1291,12 @@ document.getElementById('device-modal').addEventListener('click', e => {
 
 document.getElementById('dm-save').addEventListener('click', async () => {
   if (!dmTarget) return;
-  const { device, floorId, container } = dmTarget;
+  const { device, container, originalFloorId } = dmTarget;
+  const newFloorId = parseInt(document.getElementById('dm-floor').value) || originalFloorId;
+  const floorChanged = newFloorId !== originalFloorId;
   const updated = {
-    type:           device.type,
+    floor_id:       newFloorId,
+    type:           document.getElementById('dm-type').value || device.type,
     label:          document.getElementById('dm-label').value.trim()  || device.label,
     brand:          document.getElementById('dm-brand').value,
     model:          document.getElementById('dm-model').value,
@@ -1210,15 +1308,19 @@ document.getElementById('dm-save').addEventListener('click', async () => {
     rental_amount:  parseFloat(document.getElementById('dm-rental-amount').value) || null,
     rental_period:  document.getElementById('dm-rental-period').value || null,
     notes:          document.getElementById('dm-notes').value.trim(),
-    x_pct:          device.x_pct,
-    y_pct:          device.y_pct,
+    x_pct:          floorChanged ? 0 : device.x_pct,
+    y_pct:          floorChanged ? 0 : device.y_pct,
   };
   try {
     await api('PUT', `/devices/${device.id}`, updated);
     Object.assign(device, updated);
     toast('Device saved');
     closeDeviceModal();
-    await loadFloorDevices(floorId, container);
+    if (floorChanged) {
+      await loadClientData(activeClient.id);
+    } else {
+      await loadFloorDevices(originalFloorId, container);
+    }
   } catch (err) { toast('Error: ' + err.message); }
 });
 

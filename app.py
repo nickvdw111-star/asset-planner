@@ -115,6 +115,8 @@ def init_db():
             db.execute('ALTER TABLE models ADD COLUMN optimiser_allowed INTEGER NOT NULL DEFAULT 0')
         if 'rental_amount' not in mcols:
             db.execute('ALTER TABLE models ADD COLUMN rental_amount REAL')
+        if 'device_type' not in mcols:
+            db.execute("ALTER TABLE models ADD COLUMN device_type TEXT DEFAULT 'mfp'")
 
         cols = [r[1] for r in db.execute('PRAGMA table_info(devices)').fetchall()]
         if 'avg_mono' not in cols:
@@ -412,13 +414,14 @@ def create_model(brand_id):
         return jsonify({'error': 'name required'}), 400
     colour_type   = d.get('colour_type', 'mono')
     page_size     = d.get('page_size', 'A4')
+    device_type   = d.get('device_type', 'mfp')
     mono_rate     = d.get('mono_rate') or None
     colour_rate   = d.get('colour_rate') or None
     rental_amount = d.get('rental_amount') or None
     with get_db() as db:
         cur = db.execute(
-            'INSERT INTO models (brand_id, name, colour_type, page_size, mono_rate, colour_rate, rental_amount) VALUES (?,?,?,?,?,?,?)',
-            (brand_id, name, colour_type, page_size, mono_rate, colour_rate, rental_amount)
+            'INSERT INTO models (brand_id, name, colour_type, page_size, device_type, mono_rate, colour_rate, rental_amount) VALUES (?,?,?,?,?,?,?,?)',
+            (brand_id, name, colour_type, page_size, device_type, mono_rate, colour_rate, rental_amount)
         )
         row = db.execute('SELECT * FROM models WHERE id = ?', (cur.lastrowid,)).fetchone()
     return jsonify(dict(row)), 201
@@ -431,14 +434,15 @@ def update_model(model_id):
         return jsonify({'error': 'name required'}), 400
     colour_type       = d.get('colour_type', 'mono')
     page_size         = d.get('page_size', 'A4')
+    device_type       = d.get('device_type', 'mfp')
     mono_rate         = d.get('mono_rate') or None
     colour_rate       = d.get('colour_rate') or None
     rental_amount     = d.get('rental_amount') or None
     optimiser_allowed = 1 if d.get('optimiser_allowed') else 0
     with get_db() as db:
         db.execute(
-            'UPDATE models SET name=?, colour_type=?, page_size=?, mono_rate=?, colour_rate=?, rental_amount=?, optimiser_allowed=? WHERE id=?',
-            (name, colour_type, page_size, mono_rate, colour_rate, rental_amount, optimiser_allowed, model_id)
+            'UPDATE models SET name=?, colour_type=?, page_size=?, device_type=?, mono_rate=?, colour_rate=?, rental_amount=?, optimiser_allowed=? WHERE id=?',
+            (name, colour_type, page_size, device_type, mono_rate, colour_rate, rental_amount, optimiser_allowed, model_id)
         )
         row = db.execute('SELECT * FROM models WHERE id = ?', (model_id,)).fetchone()
     return jsonify(dict(row))
@@ -811,12 +815,17 @@ def create_device(floor_id):
 def update_device(device_id):
     d = request.json or {}
     with get_db() as db:
+        existing = db.execute('SELECT floor_id FROM devices WHERE id=?', (device_id,)).fetchone()
+        if not existing:
+            abort(404)
+        floor_id = d.get('floor_id') or existing['floor_id']
         db.execute('''
             UPDATE devices
-            SET type=?, label=?, brand=?, model=?, serial=?, notes=?, avg_mono=?, avg_colour=?,
+            SET floor_id=?, type=?, label=?, brand=?, model=?, serial=?, notes=?, avg_mono=?, avg_colour=?,
                 mono_rate=?, colour_rate=?, rental_amount=?, rental_period=?, x_pct=?, y_pct=?
             WHERE id=?
         ''', (
+            floor_id,
             d.get('type'), d.get('label'),
             d.get('brand', ''), d.get('model', ''),
             d.get('serial', ''), d.get('notes', ''),
@@ -827,8 +836,6 @@ def update_device(device_id):
             device_id,
         ))
         row = db.execute('SELECT * FROM devices WHERE id = ?', (device_id,)).fetchone()
-    if not row:
-        abort(404)
     return jsonify(dict(row))
 
 @app.route('/api/devices/<device_id>', methods=['DELETE'])
@@ -888,8 +895,7 @@ def normalize_name(s):
 def title_name(s):
     return ' '.join(s.strip().split()).title()
 
-IMPORT_REQUIRED_COLS = {'client', 'city', 'building', 'floor_level', 'floor_label',
-                        'device_type', 'label', 'serial'}
+IMPORT_REQUIRED_COLS = {'client', 'city', 'building', 'floor_level', 'floor_label', 'label', 'serial'}
 IMPORT_VALID_DEVICE_TYPES = {'printer', 'mfp', 'scanner', 'print_server'}
 
 @app.route('/api/admin/import-devices', methods=['POST'])
@@ -928,9 +934,9 @@ def import_devices():
                 errors.append({'row': i, 'type': 'parse_error',
                                'detail': f"floor_level must be an integer, got: '{row.get('floor_level', '')}'"}); continue
 
-            # device_type must be a valid value
+            # device_type is optional; validate only when provided
             dtype = row.get('device_type', '').strip().lower()
-            if dtype not in IMPORT_VALID_DEVICE_TYPES:
+            if dtype and dtype not in IMPORT_VALID_DEVICE_TYPES:
                 errors.append({'row': i, 'type': 'parse_error',
                                'detail': f"device_type must be one of: {', '.join(sorted(IMPORT_VALID_DEVICE_TYPES))}, got: '{row.get('device_type', '')}'"}); continue
 
@@ -1052,28 +1058,32 @@ def import_devices():
 
             # Normalise and resolve/create brand and model
             brand_raw = row.get('brand', '').strip()
-            brand_str = title_name(brand_raw) if brand_raw else ''
             model_raw = row.get('model', '').strip()
             model_str = title_name(model_raw) if model_raw else ''
 
+            # Use canonical DB name for brand so the dropdown matches on re-open
+            brand_str = title_name(brand_raw) if brand_raw else ''
             brand_id = None
             if brand_raw:
                 b_row = db.execute(
-                    'SELECT id FROM brands WHERE LOWER(name) = ?',
+                    'SELECT id, name FROM brands WHERE LOWER(name) = ?',
                     (normalize_name(brand_raw),)
                 ).fetchone()
                 if not b_row:
                     db.execute('INSERT OR IGNORE INTO brands (name) VALUES (?)', (brand_str,))
                     b_row = db.execute(
-                        'SELECT id FROM brands WHERE LOWER(name) = ?',
+                        'SELECT id, name FROM brands WHERE LOWER(name) = ?',
                         (normalize_name(brand_raw),)
                     ).fetchone()
                 if b_row:
-                    brand_id = b_row['id']
+                    brand_id  = b_row['id']
+                    brand_str = b_row['name']  # use canonical casing from DB
 
+            # Resolve or create model; capture its device_type for auto-fill
+            model_device_type = None
             if model_raw and brand_id is not None:
                 m_row = db.execute(
-                    'SELECT id FROM models WHERE brand_id = ? AND LOWER(name) = ?',
+                    'SELECT id, device_type FROM models WHERE brand_id = ? AND LOWER(name) = ?',
                     (brand_id, normalize_name(model_raw))
                 ).fetchone()
                 if not m_row:
@@ -1081,6 +1091,17 @@ def import_devices():
                         'INSERT OR IGNORE INTO models (brand_id, name) VALUES (?, ?)',
                         (brand_id, model_str)
                     )
+                else:
+                    model_device_type = m_row['device_type']
+
+            # device_type: CSV value wins; fall back to model catalogue; default printer
+            csv_dtype = row.get('device_type', '').strip().lower()
+            if csv_dtype in IMPORT_VALID_DEVICE_TYPES:
+                final_device_type = csv_dtype
+            elif model_device_type and model_device_type in IMPORT_VALID_DEVICE_TYPES:
+                final_device_type = model_device_type
+            else:
+                final_device_type = 'printer'
 
             # Insert device
             rental_period = row.get('rental_period', '').strip() or None
@@ -1093,7 +1114,7 @@ def import_devices():
             ''', (
                 str(uuid.uuid4()),
                 floor_id,
-                row.get('device_type', 'printer').strip().lower(),
+                final_device_type,
                 row.get('label', '').strip() or 'Device',
                 brand_str,
                 model_str,

@@ -216,6 +216,15 @@
           <input id="ed-name" class="input" type="text" placeholder="e.g. Bizhub C360i">
         </div>
         <div class="modal-field">
+          <label>Device Type</label>
+          <select id="ed-device-type" class="input" style="max-width:220px;">
+            <option value="printer">Printer</option>
+            <option value="mfp">MFP (Multifunction)</option>
+            <option value="scanner">Scanner</option>
+            <option value="print_server">Print Server</option>
+          </select>
+        </div>
+        <div class="modal-field">
           <label>Colour Type</label>
           <div class="seg-control">
             <input type="radio" name="ed-colour-type" id="ct-mono"   value="mono">
@@ -596,6 +605,7 @@ function openEditor(model, brand) {
   document.getElementById('editor-title').textContent = `✏️ ${brand.name} — ${model.name}`;
   document.getElementById('ed-name').value = model.name;
 
+  document.getElementById('ed-device-type').value = model.device_type || 'mfp';
   document.querySelector(`input[name="ed-colour-type"][value="${model.colour_type || 'mono'}"]`).checked = true;
   updateColourRateVisibility(model.colour_type || 'mono');
   document.querySelector(`input[name="ed-page-size"][value="${model.page_size || 'A4'}"]`).checked = true;
@@ -629,6 +639,7 @@ document.querySelectorAll('input[name="ed-colour-type"]').forEach(radio => {
 document.getElementById('ed-save').addEventListener('click', async () => {
   if (!selectedModel) return;
   const name        = document.getElementById('ed-name').value.trim();
+  const device_type = document.getElementById('ed-device-type').value;
   const colour_type = document.querySelector('input[name="ed-colour-type"]:checked').value;
   const page_size   = document.querySelector('input[name="ed-page-size"]:checked').value;
   const mono_rate         = parseFloat(document.getElementById('ed-mono-rate').value)    || null;
@@ -640,7 +651,7 @@ document.getElementById('ed-save').addEventListener('click', async () => {
   if (!name) { toast('Name is required'); return; }
 
   try {
-    await api('PUT', `/models/${selectedModel.model.id}`, { name, colour_type, page_size, mono_rate, colour_rate, rental_amount, optimiser_allowed });
+    await api('PUT', `/models/${selectedModel.model.id}`, { name, device_type, colour_type, page_size, mono_rate, colour_rate, rental_amount, optimiser_allowed });
     toast(`"${name}" saved`);
     closeEditor();
     renderOptimiserPool();

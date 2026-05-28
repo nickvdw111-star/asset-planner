@@ -91,18 +91,31 @@
     .empty-catalogue .big { font-size: 48px; opacity: 0.3; display: block; margin-bottom: 12px; }
 
     /* ── Catalogue right editor ── */
-    #catalogue-editor { flex: 1; padding: 28px 32px; overflow-y: auto; }
+    #catalogue-editor { flex: 1; padding: 16px 24px; overflow-y: auto; display: flex; flex-direction: column; }
     #catalogue-editor h2 {
-      font-size: 14px; color: var(--muted); margin-bottom: 16px;
-      text-transform: uppercase; letter-spacing: 0.07em;
+      font-size: 13px; color: var(--muted); margin-bottom: 12px;
+      text-transform: uppercase; letter-spacing: 0.07em; flex-shrink: 0;
     }
 
-    .editor-card {
-      background: var(--surface); border: 1px solid var(--border2); border-radius: 10px;
-      padding: 22px; max-width: 440px; margin-bottom: 24px;
+    /* ── Accordion sections ── */
+    #model-editor { display: flex; flex-direction: column; max-width: 420px; }
+    .ed-section { border: 1px solid var(--border2); border-radius: 8px; margin-bottom: 6px; overflow: hidden; flex-shrink: 0; }
+    .ed-section-head {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 14px; cursor: pointer; user-select: none;
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em;
+      color: var(--muted); background: var(--surface); transition: background 0.1s;
     }
-    .editor-card .modal-field { margin-bottom: 14px; }
-    .editor-card label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 6px; }
+    .ed-section-head:hover { background: var(--surface2); }
+    .ed-arrow { font-size: 10px; transition: transform 0.2s; }
+    .ed-section.open .ed-arrow { transform: rotate(180deg); }
+    .ed-section-body { display: none; padding: 12px 14px; border-top: 1px solid var(--border); }
+    .ed-section.open .ed-section-body { display: block; }
+    .ed-section-body .modal-field { margin-bottom: 10px; }
+    .ed-section-body .modal-field:last-child { margin-bottom: 0; }
+    .ed-section-body label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 5px; }
+    .ed-opt-row { display: flex; align-items: center; gap: 8px; padding: 10px 2px; flex-shrink: 0; }
+    .ed-actions { display: flex; gap: 8px; padding-bottom: 8px; flex-shrink: 0; }
 
     .seg-control { display: flex; gap: 0; border-radius: 6px; overflow: hidden; border: 1px solid var(--border2); width: fit-content; }
     .seg-control input[type="radio"] { display: none; }
@@ -210,66 +223,91 @@
     <!-- Model editor (shown when a model is selected) -->
     <div id="model-editor" style="display:none">
       <h2 id="editor-title">Edit Model</h2>
-      <div class="editor-card">
-        <div class="modal-field">
-          <label>Model Name</label>
-          <input id="ed-name" class="input" type="text" placeholder="e.g. Bizhub C360i">
+
+      <!-- Identity -->
+      <div class="ed-section open" id="eds-identity">
+        <div class="ed-section-head" onclick="toggleEdSection('eds-identity')">
+          <span>Identity</span><span class="ed-arrow">▾</span>
         </div>
-        <div class="modal-field">
-          <label>Device Type</label>
-          <select id="ed-device-type" class="input" style="max-width:220px;">
-            <option value="printer">Printer</option>
-            <option value="mfp">MFP (Multifunction)</option>
-            <option value="scanner">Scanner</option>
-            <option value="print_server">Print Server</option>
-          </select>
-        </div>
-        <div class="modal-field">
-          <label>Colour Type</label>
-          <div class="seg-control">
-            <input type="radio" name="ed-colour-type" id="ct-mono"   value="mono">
-            <label for="ct-mono">Mono</label>
-            <input type="radio" name="ed-colour-type" id="ct-colour" value="colour" checked>
-            <label for="ct-colour">Colour</label>
+        <div class="ed-section-body">
+          <div class="modal-field">
+            <label>Model Name</label>
+            <input id="ed-name" class="input" type="text" placeholder="e.g. Bizhub C360i">
+          </div>
+          <div class="modal-field">
+            <label>Device Type</label>
+            <select id="ed-device-type" class="input" style="max-width:220px;">
+              <option value="printer">Printer</option>
+              <option value="mfp">MFP (Multifunction)</option>
+              <option value="scanner">Scanner</option>
+              <option value="print_server">Print Server</option>
+            </select>
           </div>
         </div>
-        <div class="modal-field">
-          <label>Page Size</label>
-          <div class="seg-control">
-            <input type="radio" name="ed-page-size" id="ps-a4" value="A4" checked>
-            <label for="ps-a4">A4</label>
-            <input type="radio" name="ed-page-size" id="ps-a3" value="A3">
-            <label for="ps-a3">A3</label>
-          </div>
+      </div>
+
+      <!-- Classification -->
+      <div class="ed-section" id="eds-class">
+        <div class="ed-section-head" onclick="toggleEdSection('eds-class')">
+          <span>Classification</span><span class="ed-arrow">▾</span>
         </div>
-        <div class="modal-field">
-          <label>Standard Pricing</label>
-          <div class="rate-row">
-            <div>
-              <label style="font-size:10px; margin-bottom:4px;">Mono Rate (R/page)</label>
-              <input id="ed-mono-rate" class="input" type="number" min="0" step="0.0001" placeholder="e.g. 0.0800">
-            </div>
-            <div id="colour-rate-field">
-              <label style="font-size:10px; margin-bottom:4px;">Colour Rate (R/page)</label>
-              <input id="ed-colour-rate" class="input" type="number" min="0" step="0.0001" placeholder="e.g. 0.4500">
+        <div class="ed-section-body">
+          <div class="modal-field">
+            <label>Colour Type</label>
+            <div class="seg-control">
+              <input type="radio" name="ed-colour-type" id="ct-mono"   value="mono">
+              <label for="ct-mono">Mono</label>
+              <input type="radio" name="ed-colour-type" id="ct-colour" value="colour" checked>
+              <label for="ct-colour">Colour</label>
             </div>
           </div>
-        </div>
-        <div class="modal-field">
-          <label>Rental (R/month)</label>
-          <input id="ed-rental-amount" class="input" type="number" min="0" step="0.01" placeholder="e.g. 1500.00" style="max-width:180px;">
-        </div>
-        <div class="modal-field">
-          <label>Optimisation Pool</label>
-          <div style="display:flex; align-items:center; gap:8px; padding:6px 0;">
-            <input type="checkbox" id="ed-optimiser-allowed" style="width:16px; height:16px; accent-color:var(--accent); cursor:pointer;">
-            <span style="font-size:13px; color:var(--muted)">Available for optimised fleet building</span>
+          <div class="modal-field">
+            <label>Page Size</label>
+            <div class="seg-control">
+              <input type="radio" name="ed-page-size" id="ps-a4" value="A4" checked>
+              <label for="ps-a4">A4</label>
+              <input type="radio" name="ed-page-size" id="ps-a3" value="A3">
+              <label for="ps-a3">A3</label>
+            </div>
           </div>
         </div>
-        <div style="display:flex; gap:8px; margin-top:6px;">
-          <button class="btn btn-primary" id="ed-save">Save Changes</button>
-          <button class="btn btn-neutral" id="ed-cancel">Cancel</button>
+      </div>
+
+      <!-- Pricing -->
+      <div class="ed-section open" id="eds-pricing">
+        <div class="ed-section-head" onclick="toggleEdSection('eds-pricing')">
+          <span>Pricing</span><span class="ed-arrow">▾</span>
         </div>
+        <div class="ed-section-body">
+          <div class="modal-field">
+            <label>CPC Rates</label>
+            <div class="rate-row">
+              <div>
+                <label style="font-size:10px; margin-bottom:4px;">Mono (R/page)</label>
+                <input id="ed-mono-rate" class="input" type="number" min="0" step="0.0001" placeholder="0.0800">
+              </div>
+              <div id="colour-rate-field">
+                <label style="font-size:10px; margin-bottom:4px;">Colour (R/page)</label>
+                <input id="ed-colour-rate" class="input" type="number" min="0" step="0.0001" placeholder="0.4500">
+              </div>
+            </div>
+          </div>
+          <div class="modal-field">
+            <label>Rental (R/month)</label>
+            <input id="ed-rental-amount" class="input" type="number" min="0" step="0.01" placeholder="e.g. 1500.00" style="max-width:180px;">
+          </div>
+        </div>
+      </div>
+
+      <!-- Optimisation pool + actions always visible -->
+      <div class="ed-opt-row">
+        <input type="checkbox" id="ed-optimiser-allowed" style="width:16px; height:16px; accent-color:var(--accent); cursor:pointer;">
+        <span style="font-size:13px; color:var(--muted)">Available for optimised fleet building</span>
+      </div>
+      <div class="ed-actions">
+        <button class="btn btn-primary" id="ed-save">Save Changes</button>
+        <button class="btn btn-neutral" id="ed-cancel">Cancel</button>
+      </div>
       </div>
     </div>
 
@@ -598,11 +636,18 @@ function render() {
 
 // ── Model editor ──────────────────────────────────────────────────────────────
 
+function toggleEdSection(id) {
+  document.getElementById(id).classList.toggle('open');
+}
+
 function openEditor(model, brand) {
   selectedModel = { model, brand };
   document.getElementById('model-editor').style.display = 'block';
   document.getElementById('add-brand-section').style.display = 'none';
   document.getElementById('editor-title').textContent = `✏️ ${brand.name} — ${model.name}`;
+  document.getElementById('eds-identity').classList.add('open');
+  document.getElementById('eds-class').classList.remove('open');
+  document.getElementById('eds-pricing').classList.add('open');
   document.getElementById('ed-name').value = model.name;
 
   document.getElementById('ed-device-type').value = model.device_type || 'mfp';

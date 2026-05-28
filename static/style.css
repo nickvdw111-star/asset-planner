@@ -19,6 +19,30 @@
   --badge-t:  #86efac;
 }
 
+/* ── Light theme overrides ── */
+[data-theme="light"] {
+  --bg:       #f8fafc;
+  --surface:  #ffffff;
+  --surface2: #f1f5f9;
+  --border:   #e2e8f0;
+  --border2:  #cbd5e1;
+  --accent:   #16a34a;
+  --accent-h: #15803d;
+  --text:     #0f172a;
+  --muted:    #64748b;
+  --muted2:   #94a3b8;
+  --danger:   #fef2f2;
+  --danger-t: #dc2626;
+  --success:  #15803d;
+  --badge-bg: #dcfce7;
+  --badge-t:  #166534;
+}
+[data-theme="light"] .modal {
+  box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+}
+[data-theme="light"] .leaflet-container { background: #e5e7eb !important; }
+[data-theme="light"] .leaflet-popup-content-wrapper { box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
+
 body {
   font-family: system-ui, -apple-system, sans-serif;
   background: var(--bg);

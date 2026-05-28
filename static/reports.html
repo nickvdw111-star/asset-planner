@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Fleet Report — Asset Planner</title>
+  <script src="theme.js"></script>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
@@ -210,6 +211,7 @@
   <div style="margin-left:auto; display:flex; gap:8px;">
     <button class="btn btn-ghost btn-sm" id="pdf-btn">📄 Export PDF</button>
     <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨 Print</button>
+    <button class="btn btn-ghost btn-sm theme-btn" onclick="toggleTheme()" title="Switch theme">☀</button>
   </div>
 </header>
 

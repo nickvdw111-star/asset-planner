@@ -214,7 +214,26 @@
     #toast.show { transform: translateX(-50%) translateY(0); }
 
     /* ── Modals ── */
+    #device-modal .modal { display: flex; flex-direction: column; max-height: 90vh; }
+    #device-modal .modal h2 { flex-shrink: 0; }
+    #device-modal .dm-accordion { flex: 1; overflow-y: auto; margin-bottom: 0; }
     #confirm-modal .modal { width: 320px; }
+
+    /* ── Device modal accordion ── */
+    .dm-section { border: 1px solid var(--border2); border-radius: 8px; margin-bottom: 6px; overflow: hidden; }
+    .dm-section-head {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 14px; cursor: pointer; user-select: none;
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em;
+      color: var(--muted); background: var(--surface); transition: background 0.1s;
+    }
+    .dm-section-head:hover { background: var(--surface2); }
+    .dm-arrow { font-size: 10px; transition: transform 0.2s; }
+    .dm-section.open .dm-arrow { transform: rotate(180deg); }
+    .dm-section-body { display: none; padding: 12px 14px; border-top: 1px solid var(--border); }
+    .dm-section.open .dm-section-body { display: block; }
+    .dm-section-body .modal-field { margin-bottom: 10px; }
+    .dm-section-body .modal-field:last-child { margin-bottom: 0; }
     #confirm-modal p { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
     #confirm-modal strong { color: var(--text); }
 
@@ -340,99 +359,141 @@
 
 <!-- Device detail modal -->
 <div class="modal-backdrop" id="device-modal">
-  <div class="modal" style="width:400px">
+  <div class="modal" style="width:420px">
     <h2 id="dm-title">✏️ Device Details</h2>
-    <div class="modal-field">
-      <label>Name</label>
-      <input type="text" class="input" id="dm-label" placeholder="e.g. Reception Printer">
-    </div>
-    <div class="modal-field">
-      <label>Brand</label>
-      <div class="select-with-add">
-        <select id="dm-brand" class="input"><option value="">— Select brand —</option></select>
-        <button class="btn btn-ghost btn-sm" id="dm-add-brand-btn" type="button">+ Add</button>
+    <div class="dm-accordion">
+
+      <!-- Device -->
+      <div class="dm-section open" id="dms-device">
+        <div class="dm-section-head" onclick="toggleDmSection('dms-device')">
+          <span>Device</span><span class="dm-arrow">▾</span>
+        </div>
+        <div class="dm-section-body">
+          <div class="modal-field">
+            <label>Name</label>
+            <input type="text" class="input" id="dm-label" placeholder="e.g. Reception Printer">
+          </div>
+          <div class="modal-field">
+            <label>Brand</label>
+            <div class="select-with-add">
+              <select id="dm-brand" class="input"><option value="">— Select brand —</option></select>
+              <button class="btn btn-ghost btn-sm" id="dm-add-brand-btn" type="button">+ Add</button>
+            </div>
+            <div class="inline-add" id="dm-brand-add-row">
+              <input type="text" class="input" id="dm-new-brand" placeholder="New brand name">
+              <button class="btn btn-primary btn-sm" id="dm-save-brand-btn">Save</button>
+              <button class="btn btn-neutral btn-sm" id="dm-cancel-brand-btn">Cancel</button>
+            </div>
+          </div>
+          <div class="modal-field">
+            <label>Model</label>
+            <div class="select-with-add">
+              <select id="dm-model" class="input"><option value="">— Select brand first —</option></select>
+              <button class="btn btn-ghost btn-sm" id="dm-add-model-btn" type="button">+ Add</button>
+            </div>
+            <div class="inline-add" id="dm-model-add-row">
+              <input type="text" class="input" id="dm-new-model" placeholder="New model name">
+              <button class="btn btn-primary btn-sm" id="dm-save-model-btn">Save</button>
+              <button class="btn btn-neutral btn-sm" id="dm-cancel-model-btn">Cancel</button>
+            </div>
+          </div>
+          <div class="modal-field">
+            <label>Device Type</label>
+            <select class="input" id="dm-type">
+              <option value="printer">Printer</option>
+              <option value="mfp">MFP (Multifunction)</option>
+              <option value="scanner">Scanner</option>
+              <option value="print_server">Print Server</option>
+            </select>
+          </div>
+          <div class="modal-field">
+            <label>Serial Number</label>
+            <input type="text" class="input" id="dm-serial" placeholder="e.g. VND3X12345">
+          </div>
+        </div>
       </div>
-      <div class="inline-add" id="dm-brand-add-row">
-        <input type="text" class="input" id="dm-new-brand" placeholder="New brand name">
-        <button class="btn btn-primary btn-sm" id="dm-save-brand-btn">Save</button>
-        <button class="btn btn-neutral btn-sm" id="dm-cancel-brand-btn">Cancel</button>
+
+      <!-- Location -->
+      <div class="dm-section" id="dms-location">
+        <div class="dm-section-head" onclick="toggleDmSection('dms-location')">
+          <span>Location</span><span class="dm-arrow">▾</span>
+        </div>
+        <div class="dm-section-body">
+          <div class="modal-field">
+            <label>City</label>
+            <select class="input" id="dm-city"><option value="">— Select city —</option></select>
+          </div>
+          <div class="modal-field">
+            <label>Building</label>
+            <select class="input" id="dm-building"><option value="">— Select building —</option></select>
+          </div>
+          <div class="modal-field">
+            <label>Floor</label>
+            <select class="input" id="dm-floor"><option value="">— Select floor —</option></select>
+          </div>
+        </div>
       </div>
-    </div>
-    <div class="modal-field">
-      <label>Model</label>
-      <div class="select-with-add">
-        <select id="dm-model" class="input"><option value="">— Select brand first —</option></select>
-        <button class="btn btn-ghost btn-sm" id="dm-add-model-btn" type="button">+ Add</button>
+
+      <!-- Usage & Rates -->
+      <div class="dm-section open" id="dms-rates">
+        <div class="dm-section-head" onclick="toggleDmSection('dms-rates')">
+          <span>Usage &amp; Rates</span><span class="dm-arrow">▾</span>
+        </div>
+        <div class="dm-section-body">
+          <div class="modal-field" style="display:flex; gap:10px">
+            <div style="flex:1">
+              <label>Avg Mono Vol</label>
+              <input type="number" class="input" id="dm-mono" min="0" placeholder="e.g. 2000">
+            </div>
+            <div style="flex:1">
+              <label>Avg Colour Vol</label>
+              <input type="number" class="input" id="dm-colour" min="0" placeholder="e.g. 500">
+            </div>
+          </div>
+          <div class="modal-field" style="display:flex; gap:10px">
+            <div style="flex:1">
+              <label>Mono Rate (R/page)</label>
+              <input type="number" class="input" id="dm-mono-rate" min="0" step="0.001" placeholder="0.08">
+            </div>
+            <div style="flex:1">
+              <label>Colour Rate (R/page)</label>
+              <input type="number" class="input" id="dm-colour-rate" min="0" step="0.001" placeholder="0.45">
+            </div>
+          </div>
+          <div class="modal-field" style="display:flex; gap:10px; align-items:flex-end">
+            <div style="flex:1">
+              <label>Rental (R/month)</label>
+              <input type="number" class="input" id="dm-rental-amount" min="0" step="0.01" placeholder="850.00">
+            </div>
+            <div style="flex:1">
+              <label>Rental Period</label>
+              <select class="input" id="dm-rental-period">
+                <option value="">No rental</option>
+                <option value="12">12 months</option>
+                <option value="24">24 months</option>
+                <option value="36">36 months</option>
+                <option value="72">72 months</option>
+                <option value="Evergreen">Evergreen</option>
+              </select>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="inline-add" id="dm-model-add-row">
-        <input type="text" class="input" id="dm-new-model" placeholder="New model name">
-        <button class="btn btn-primary btn-sm" id="dm-save-model-btn">Save</button>
-        <button class="btn btn-neutral btn-sm" id="dm-cancel-model-btn">Cancel</button>
+
+      <!-- Notes -->
+      <div class="dm-section" id="dms-notes">
+        <div class="dm-section-head" onclick="toggleDmSection('dms-notes')">
+          <span>Notes</span><span class="dm-arrow">▾</span>
+        </div>
+        <div class="dm-section-body">
+          <div class="modal-field">
+            <textarea class="input" id="dm-notes" placeholder="e.g. Shared with finance"></textarea>
+          </div>
+        </div>
       </div>
-    </div>
-    <div class="modal-field">
-      <label>Device Type</label>
-      <select class="input" id="dm-type">
-        <option value="printer">Printer</option>
-        <option value="mfp">MFP (Multifunction)</option>
-        <option value="scanner">Scanner</option>
-        <option value="print_server">Print Server</option>
-      </select>
-    </div>
-    <div class="modal-field">
-      <label>Location</label>
-      <div style="display:flex; flex-direction:column; gap:6px;">
-        <select class="input" id="dm-city"><option value="">— Select city —</option></select>
-        <select class="input" id="dm-building"><option value="">— Select building —</option></select>
-        <select class="input" id="dm-floor"><option value="">— Select floor —</option></select>
-      </div>
-    </div>
-    <div class="modal-field">
-      <label>Serial Number</label>
-      <input type="text" class="input" id="dm-serial" placeholder="e.g. VND3X12345">
-    </div>
-    <div class="modal-field" style="display:flex; gap:10px">
-      <div style="flex:1">
-        <label>Avg Mono Volume</label>
-        <input type="number" class="input" id="dm-mono" min="0" placeholder="e.g. 2000">
-      </div>
-      <div style="flex:1">
-        <label>Avg Colour Volume</label>
-        <input type="number" class="input" id="dm-colour" min="0" placeholder="e.g. 500">
-      </div>
-    </div>
-    <div class="modal-field" style="display:flex; gap:10px">
-      <div style="flex:1">
-        <label>Mono Rate (R/page)</label>
-        <input type="number" class="input" id="dm-mono-rate" min="0" step="0.001" placeholder="e.g. 0.08">
-      </div>
-      <div style="flex:1">
-        <label>Colour Rate (R/page)</label>
-        <input type="number" class="input" id="dm-colour-rate" min="0" step="0.001" placeholder="e.g. 0.45">
-      </div>
-    </div>
-    <div class="modal-field" style="display:flex; gap:10px; align-items:flex-end">
-      <div style="flex:1">
-        <label>Rental Amount (R/month)</label>
-        <input type="number" class="input" id="dm-rental-amount" min="0" step="0.01" placeholder="e.g. 850.00">
-      </div>
-      <div style="flex:1">
-        <label>Rental Period</label>
-        <select class="input" id="dm-rental-period">
-          <option value="">No rental</option>
-          <option value="12">12 months</option>
-          <option value="24">24 months</option>
-          <option value="36">36 months</option>
-          <option value="72">72 months</option>
-          <option value="Evergreen">Evergreen</option>
-        </select>
-      </div>
-    </div>
-    <div class="modal-field">
-      <label>Notes</label>
-      <textarea class="input" id="dm-notes" placeholder="e.g. Shared with finance"></textarea>
-    </div>
-    <div class="modal-actions">
+
+    </div><!-- end dm-accordion -->
+    <div class="modal-actions" style="margin-top:14px; flex-shrink:0">
       <button class="btn btn-neutral" id="dm-cancel">Cancel</button>
       <button class="btn btn-primary" id="dm-save">Save Changes</button>
     </div>
@@ -1190,6 +1251,10 @@ document.getElementById('dm-model').addEventListener('change', e => {
 
 let dmTarget = null; // { device, floorId, container }
 
+function toggleDmSection(id) {
+  document.getElementById(id).classList.toggle('open');
+}
+
 function findDeviceLocation(floorId) {
   if (!activeClient) return null;
   for (const city of activeClient.cities) {
@@ -1249,6 +1314,12 @@ function populateDmFloor(buildingId, selectedFloorId) {
 function openDeviceModal(device, floorId, container) {
   const loc = findDeviceLocation(floorId);
   dmTarget = { device, floorId, container, originalFloorId: floorId };
+
+  // Reset accordion state
+  document.getElementById('dms-device').classList.add('open');
+  document.getElementById('dms-location').classList.remove('open');
+  document.getElementById('dms-rates').classList.add('open');
+  document.getElementById('dms-notes').classList.remove('open');
 
   const icons = DEVICE_ICONS_MAP;
   document.getElementById('dm-title').textContent = `${icons[device.type] || '🖨'} ${device.label || 'Device'}`;

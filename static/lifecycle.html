@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Lifecycle & Risk — Asset Planner</title>
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { display: flex; flex-direction: column; min-height: 100vh; }
+
+    /* ── Header ── */
+    header {
+      padding: 12px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 12px;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 17px; font-weight: 600; }
+
+    /* ── Client bar ── */
+    #client-bar {
+      padding: 10px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+      flex-shrink: 0;
+    }
+    #client-select {
+      background: var(--bg); border: 1px solid var(--border2);
+      border-radius: 6px; color: var(--text); font-size: 13px;
+      padding: 7px 10px; outline: none; cursor: pointer; min-width: 220px;
+      font-family: inherit;
+    }
+    #client-select:focus { border-color: var(--accent-h); }
+    #client-select option { background: var(--surface2); }
+    .client-bar-label { font-size: 12px; color: var(--muted); }
+
+    /* ── Summary cards ── */
+    #summary-cards {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      padding: 16px 20px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+    }
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .summary-card .sc-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+    .summary-card .sc-value { font-size: 26px; font-weight: 700; line-height: 1; }
+    .summary-card .sc-sub   { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .sc-red    .sc-value { color: #f87171; }
+    .sc-amber  .sc-value { color: #fbbf24; }
+    .sc-green  .sc-value { color: var(--accent-h); }
+    .sc-purple .sc-value { color: #a78bfa; }
+
+    /* ── Filters ── */
+    #filter-bar {
+      padding: 10px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 12px;
+      flex-shrink: 0;
+    }
+    .filter-label { font-size: 12px; color: var(--muted); }
+    .filter-chips { display: flex; gap: 6px; }
+    .chip {
+      padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;
+      cursor: pointer; border: 1px solid var(--border2); background: transparent;
+      color: var(--muted); transition: all 0.15s;
+    }
+    .chip:hover { background: var(--surface2); color: var(--text); }
+    .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .chip.chip-red.active    { background: #7f1d1d; color: #f87171; border-color: #f87171; }
+    .chip.chip-amber.active  { background: #78350f; color: #fbbf24; border-color: #fbbf24; }
+    .chip.chip-green.active  { background: #14291e; color: var(--accent-h); border-color: var(--accent-h); }
+    #filter-search { padding: 5px 10px; font-size: 12px; margin-left: auto; width: 200px; }
+
+    /* ── Main content ── */
+    #main { flex: 1; overflow-y: auto; padding: 0 20px 24px; }
+
+    /* ── Empty state ── */
+    #empty-state {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 80px 20px; color: var(--muted2); gap: 12px; text-align: center;
+    }
+    #empty-state .big { font-size: 56px; opacity: 0.4; }
+    #empty-state p { font-size: 14px; line-height: 1.8; }
+    #empty-state.hidden { display: none; }
+
+    #loading { padding: 40px; text-align: center; color: var(--muted); font-size: 14px; display: none; }
+    #loading.visible { display: block; }
+
+    /* ── Table ── */
+    #device-table-wrap { overflow-x: auto; }
+    #device-table {
+      width: 100%; border-collapse: collapse; margin-top: 16px;
+      font-size: 13px;
+    }
+    #device-table th {
+      text-align: left; padding: 8px 12px;
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--muted);
+      border-bottom: 2px solid var(--border2);
+      white-space: nowrap;
+    }
+    #device-table th.sortable { cursor: pointer; user-select: none; }
+    #device-table th.sortable:hover { color: var(--text); }
+    #device-table th .sort-arrow { margin-left: 4px; opacity: 0.4; }
+    #device-table th.sort-asc .sort-arrow::after  { content: '▲'; }
+    #device-table th.sort-desc .sort-arrow::after { content: '▼'; }
+    #device-table th:not(.sort-asc):not(.sort-desc) .sort-arrow::after { content: '⇅'; }
+
+    #device-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    #device-table tr:hover td { background: var(--surface2); }
+
+    /* Risk column */
+    .risk-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+    .risk-badge {
+      padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap;
+    }
+    .risk-high   { background: #7f1d1d; color: #f87171; }
+    .risk-medium { background: #78350f; color: #fbbf24; }
+    .risk-low    { background: #14291e; color: #86efac; }
+    .risk-score-num { font-size: 10px; color: var(--muted); }
+
+    /* Left border color by risk */
+    tr.row-high   td:first-child { border-left: 3px solid #f87171; }
+    tr.row-medium td:first-child { border-left: 3px solid #fbbf24; }
+    tr.row-low    td:first-child { border-left: 3px solid #22c55e; }
+
+    /* Device cell */
+    .dev-name  { font-weight: 600; }
+    .dev-meta  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .dev-serial {
+      display: inline-block; margin-top: 4px;
+      font-size: 10px; color: var(--accent-h); background: var(--badge-bg);
+      padding: 1px 7px; border-radius: 10px;
+    }
+    .dev-serial.empty { color: var(--muted2); background: var(--surface2); }
+
+    /* Location cell */
+    .loc-building { font-weight: 500; }
+    .loc-city     { font-size: 11px; color: var(--muted); margin-top: 1px; }
+    .loc-floor    { font-size: 10px; color: var(--muted2); margin-top: 1px; }
+
+    /* Contract cell */
+    .contract-status {
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      font-size: 11px; font-weight: 600; margin-bottom: 4px;
+    }
+    .status-expired    { background: #7f1d1d; color: #fca5a5; }
+    .status-expiring   { background: #78350f; color: #fde68a; }
+    .status-active     { background: #14291e; color: #86efac; }
+    .status-evergreen  { background: #1e1b4b; color: #a5b4fc; }
+    .status-nodate     { background: var(--surface2); color: var(--muted); }
+    .contract-detail   { font-size: 11px; color: var(--muted); }
+    .contract-age      { font-size: 10px; color: var(--muted2); margin-top: 2px; }
+
+    /* Revenue cell */
+    .rev-amount { font-weight: 600; font-size: 14px; }
+    .rev-sub    { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+    /* Delta cell */
+    .delta-pos { color: var(--accent-h); font-weight: 600; }
+    .delta-neg { color: #f87171; font-weight: 600; }
+    .delta-na  { color: var(--muted2); font-size: 11px; }
+
+    /* Projections cell */
+    .proj-row { display: flex; gap: 8px; flex-direction: column; }
+    .proj-item { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; }
+    .proj-label { color: var(--muted); }
+    .proj-val   { font-weight: 500; }
+    .proj-down  { color: #f87171; }
+    .proj-up    { color: var(--accent-h); }
+    .proj-flat  { color: var(--muted); }
+
+    /* Action cell */
+    .action-badge {
+      display: inline-block; padding: 4px 10px; border-radius: 6px;
+      font-size: 11px; font-weight: 500;
+    }
+    .action-replace   { background: #7f1d1d; color: #fca5a5; }
+    .action-review    { background: #78350f; color: #fde68a; }
+    .action-keep      { background: #14291e; color: #86efac; }
+
+    /* Score breakdown tooltip */
+    .score-bar { display: flex; gap: 2px; margin-top: 4px; height: 4px; width: 60px; }
+    .score-seg {
+      height: 4px; border-radius: 2px; flex-shrink: 0;
+    }
+    .score-seg-age     { background: #a78bfa; }
+    .score-seg-expiry  { background: #f87171; }
+    .score-seg-revenue { background: #fb923c; }
+    .score-seg-volume  { background: #60a5fa; }
+
+    /* No-data rows */
+    .no-data-row td { color: var(--muted); font-style: italic; text-align: center; padding: 24px; }
+
+    /* ── Modals / Toast ── */
+    #toast {
+      position: fixed; bottom: 24px; left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--surface2); border: 1px solid var(--border2);
+      border-radius: 8px; padding: 10px 18px; font-size: 13px; color: var(--text);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4); transition: transform 0.25s ease;
+      z-index: 9999; white-space: nowrap;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🔬 Lifecycle &amp; Risk</h1>
+  <span style="font-size:12px; color:var(--muted); margin-left:4px;">Device Lifecycle Analysis</span>
+  <div style="margin-left:auto; display:flex; gap:8px;">
+    <a href="/" class="btn btn-neutral" style="text-decoration:none">📋 Dashboard</a>
+    <a id="reports-link" href="/reports" class="btn btn-neutral" style="text-decoration:none">📊 Reports</a>
+    <a id="tco-link" href="/tco" class="btn btn-neutral" style="text-decoration:none">💰 TCO</a>
+    <a id="admin-link" href="/admin" class="btn btn-neutral" style="text-decoration:none">⚙️ Admin</a>
+    <button class="btn btn-ghost btn-sm theme-btn" onclick="toggleTheme()" title="Switch theme">☀</button>
+  </div>
+</header>
+
+<!-- Client selector -->
+<div id="client-bar">
+  <span class="client-bar-label">Client</span>
+  <select id="client-select">
+    <option value="">— Select a client —</option>
+  </select>
+  <span id="device-count-label" style="font-size:12px; color:var(--muted);"></span>
+</div>
+
+<!-- Summary cards -->
+<div id="summary-cards" style="display:none;">
+  <div class="summary-card sc-red">
+    <div class="sc-label">High Risk</div>
+    <div class="sc-value" id="sc-high">0</div>
+    <div class="sc-sub">devices need attention</div>
+  </div>
+  <div class="summary-card sc-amber">
+    <div class="sc-label">Expiring ≤ 6 months</div>
+    <div class="sc-value" id="sc-expiring">0</div>
+    <div class="sc-sub">rental contracts</div>
+  </div>
+  <div class="summary-card sc-purple">
+    <div class="sc-label">Revenue at Risk / mo</div>
+    <div class="sc-value" id="sc-revenue-risk">R0</div>
+    <div class="sc-sub">from post-expiry devices</div>
+  </div>
+  <div class="summary-card sc-green">
+    <div class="sc-label">Total Monthly Revenue</div>
+    <div class="sc-value" id="sc-total-rev">R0</div>
+    <div class="sc-sub">effective current rates</div>
+  </div>
+</div>
+
+<!-- Filter bar -->
+<div id="filter-bar" style="display:none;">
+  <span class="filter-label">Risk:</span>
+  <div class="filter-chips" id="risk-chips">
+    <button class="chip active" data-risk="all">All</button>
+    <button class="chip chip-red"   data-risk="high">High</button>
+    <button class="chip chip-amber" data-risk="medium">Medium</button>
+    <button class="chip chip-green" data-risk="low">Low</button>
+  </div>
+  <span class="filter-label" style="margin-left:16px;">Status:</span>
+  <div class="filter-chips" id="status-chips">
+    <button class="chip active" data-status="all">All</button>
+    <button class="chip" data-status="expired">Post-Expiry</button>
+    <button class="chip" data-status="expiring">Expiring Soon</button>
+    <button class="chip" data-status="active">In Contract</button>
+    <button class="chip" data-status="nodate">No Date Set</button>
+  </div>
+  <input type="search" class="input" id="filter-search" placeholder="Filter by name or serial…">
+</div>
+
+<!-- Main content -->
+<div id="main">
+  <div id="empty-state">
+    <div class="big">🔬</div>
+    <p>Select a client to see their device lifecycle analysis.<br>
+    Set a <strong>Contract Start Date</strong> on each device to enable risk scoring.</p>
+  </div>
+
+  <div id="loading">Loading lifecycle data…</div>
+
+  <div id="device-table-wrap" style="display:none;">
+    <table id="device-table">
+      <thead>
+        <tr>
+          <th class="sortable" data-sort="risk_score">Risk <span class="sort-arrow"></span></th>
+          <th>Device</th>
+          <th>Location</th>
+          <th class="sortable" data-sort="age_months">Contract <span class="sort-arrow"></span></th>
+          <th class="sortable" data-sort="monthly_total_rev">Monthly Rev <span class="sort-arrow"></span></th>
+          <th class="sortable" data-sort="revenue_delta">Rev Δ <span class="sort-arrow"></span></th>
+          <th>Projections</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="table-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let allDevices     = [];
+let activeClientId = null;
+let riskFilter     = 'all';
+let statusFilter   = 'all';
+let sortKey        = 'risk_score';
+let sortDir        = 'desc';
+
+// ── API ───────────────────────────────────────────────────────────────────────
+async function api(method, path, body) {
+  const opts = { method, headers: {} };
+  if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  const res = await fetch('/api' + path, opts);
+  if (!res.ok) throw new Error(await res.text());
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ── Formatting helpers ────────────────────────────────────────────────────────
+function fmtMoney(v) {
+  if (v == null || v === 0) return '—';
+  return 'R' + v.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+function fmtMoneyExact(v) {
+  if (v == null) return '—';
+  return 'R' + v.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtAge(months) {
+  if (!months && months !== 0) return '—';
+  if (months < 12) return `${months}mo`;
+  const y = Math.floor(months / 12);
+  const m = months % 12;
+  return m > 0 ? `${y}y ${m}mo` : `${y}y`;
+}
+
+// ── Client loader ─────────────────────────────────────────────────────────────
+async function loadClients() {
+  const clients = await api('GET', '/clients');
+  const sel = document.getElementById('client-select');
+  sel.innerHTML = '<option value="">— Select a client —</option>';
+  clients.forEach(c => {
+    const o = document.createElement('option');
+    o.value = c.id; o.textContent = c.name;
+    sel.appendChild(o);
+  });
+  const qs = parseInt(new URLSearchParams(location.search).get('client'));
+  if (qs && clients.find(c => c.id === qs)) {
+    sel.value = qs;
+    loadLifecycle(qs);
+  }
+}
+
+document.getElementById('client-select').addEventListener('change', e => {
+  const id = parseInt(e.target.value);
+  if (!id) { clearView(); return; }
+  loadLifecycle(id);
+  document.getElementById('reports-link').href = `/reports?client=${id}`;
+  document.getElementById('tco-link').href     = `/tco?client=${id}`;
+  document.getElementById('admin-link').href   = `/admin?client=${id}`;
+});
+
+function clearView() {
+  allDevices = [];
+  activeClientId = null;
+  document.getElementById('summary-cards').style.display = 'none';
+  document.getElementById('filter-bar').style.display    = 'none';
+  document.getElementById('device-table-wrap').style.display = 'none';
+  document.getElementById('loading').classList.remove('visible');
+  document.getElementById('empty-state').classList.remove('hidden');
+  document.getElementById('device-count-label').textContent = '';
+}
+
+async function loadLifecycle(clientId) {
+  activeClientId = clientId;
+  document.getElementById('empty-state').classList.add('hidden');
+  document.getElementById('device-table-wrap').style.display = 'none';
+  document.getElementById('loading').classList.add('visible');
+  try {
+    allDevices = await api('GET', `/clients/${clientId}/lifecycle`);
+    document.getElementById('loading').classList.remove('visible');
+    document.getElementById('summary-cards').style.display = 'grid';
+    document.getElementById('filter-bar').style.display    = 'flex';
+    document.getElementById('device-table-wrap').style.display = 'block';
+    renderSummary();
+    renderTable();
+  } catch (err) {
+    document.getElementById('loading').classList.remove('visible');
+    toast('Error loading lifecycle data: ' + err.message);
+    document.getElementById('empty-state').classList.remove('hidden');
+  }
+}
+
+// ── Summary cards ─────────────────────────────────────────────────────────────
+function renderSummary() {
+  const highRisk  = allDevices.filter(d => d.risk_band === 'high').length;
+  const expiring  = allDevices.filter(d => d.months_to_expiry != null && d.months_to_expiry <= 6).length;
+  const revAtRisk = allDevices
+    .filter(d => d.is_expired)
+    .reduce((s, d) => s + Math.abs(d.revenue_delta || 0), 0);
+  const totalRev  = allDevices.reduce((s, d) => s + (d.monthly_total_rev || 0), 0);
+
+  document.getElementById('sc-high').textContent         = highRisk;
+  document.getElementById('sc-expiring').textContent     = expiring;
+  document.getElementById('sc-revenue-risk').textContent = fmtMoney(revAtRisk);
+  document.getElementById('sc-total-rev').textContent    = fmtMoney(totalRev);
+  document.getElementById('device-count-label').textContent =
+    `${allDevices.length} device${allDevices.length !== 1 ? 's' : ''}`;
+}
+
+// ── Table rendering ───────────────────────────────────────────────────────────
+function getFilteredDevices() {
+  const q = document.getElementById('filter-search').value.trim().toLowerCase();
+  return allDevices.filter(d => {
+    if (riskFilter !== 'all' && d.risk_band !== riskFilter) return false;
+    if (statusFilter === 'expired'  && !d.is_expired) return false;
+    if (statusFilter === 'expiring' && !(d.months_to_expiry != null && d.months_to_expiry <= 6)) return false;
+    if (statusFilter === 'active'   && !(d.months_to_expiry != null && d.months_to_expiry > 6)) return false;
+    if (statusFilter === 'nodate'   && d.contract_start_date) return false;
+    if (q && !(
+      (d.label  || '').toLowerCase().includes(q) ||
+      (d.serial || '').toLowerCase().includes(q)
+    )) return false;
+    return true;
+  });
+}
+
+function sortedDevices(devices) {
+  return [...devices].sort((a, b) => {
+    let va = a[sortKey] ?? (sortDir === 'desc' ? -Infinity : Infinity);
+    let vb = b[sortKey] ?? (sortDir === 'desc' ? -Infinity : Infinity);
+    if (typeof va === 'string') va = va.toLowerCase();
+    if (typeof vb === 'string') vb = vb.toLowerCase();
+    if (va < vb) return sortDir === 'desc' ? 1 : -1;
+    if (va > vb) return sortDir === 'desc' ? -1 : 1;
+    return 0;
+  });
+}
+
+function renderTable() {
+  const tbody  = document.getElementById('table-body');
+  const devices = sortedDevices(getFilteredDevices());
+
+  // Update sort arrows
+  document.querySelectorAll('#device-table th.sortable').forEach(th => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (th.dataset.sort === sortKey) {
+      th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+    }
+  });
+
+  tbody.innerHTML = '';
+
+  if (!devices.length) {
+    tbody.innerHTML = '<tr class="no-data-row"><td colspan="8">No devices match the current filters.</td></tr>';
+    return;
+  }
+
+  devices.forEach(d => tbody.appendChild(makeRow(d)));
+}
+
+function makeRow(d) {
+  const tr = document.createElement('tr');
+  tr.className = `row-${d.risk_band}`;
+
+  // ── Risk ──
+  const breakdown = d.risk_breakdown || {};
+  const totalWidth = 60;
+  const maxScore   = 100;
+  const segments = [
+    { key: 'age',            cls: 'score-seg-age',     val: breakdown.age || 0 },
+    { key: 'expiry',         cls: 'score-seg-expiry',  val: breakdown.expiry || 0 },
+    { key: 'revenue_delta',  cls: 'score-seg-revenue', val: breakdown.revenue_delta || 0 },
+    { key: 'volume',         cls: 'score-seg-volume',  val: breakdown.volume || 0 },
+  ];
+  const barHtml = segments.map(s => {
+    const w = Math.round((s.val / maxScore) * totalWidth);
+    return w > 0 ? `<div class="score-seg ${s.cls}" style="width:${w}px" title="${s.key}: ${s.val}pts"></div>` : '';
+  }).join('');
+
+  tr.innerHTML = `
+    <td>
+      <div class="risk-cell">
+        <span class="risk-badge risk-${d.risk_band}">${d.risk_band}</span>
+        <span class="risk-score-num">${d.risk_score}/100</span>
+        <div class="score-bar">${barHtml}</div>
+      </div>
+    </td>
+    <td>
+      <div class="dev-name">${escHtml(d.label || 'Unnamed')}</div>
+      <div class="dev-meta">${escHtml([d.brand, d.model].filter(Boolean).join(' · ') || '—')}</div>
+      <span class="dev-serial${d.serial ? '' : ' empty'}">${escHtml(d.serial || 'No serial')}</span>
+    </td>
+    <td>
+      <div class="loc-building">${escHtml(d.building_name || '—')}</div>
+      <div class="loc-city">${escHtml(d.city_name || '')}</div>
+      <div class="loc-floor">${escHtml(d.floor_label || '')}</div>
+    </td>
+    <td>${contractCell(d)}</td>
+    <td>
+      <div class="rev-amount">${fmtMoney(d.monthly_total_rev)}</div>
+      <div class="rev-sub">
+        Clicks: ${fmtMoney(d.monthly_click_rev)}<br>
+        Rental: ${fmtMoney(d.effective_rental)}
+      </div>
+    </td>
+    <td>${deltaCell(d)}</td>
+    <td>${projectionsCell(d)}</td>
+    <td>${actionCell(d)}</td>
+  `;
+  return tr;
+}
+
+function contractCell(d) {
+  if (!d.contract_start_date) {
+    return `<span class="contract-status status-nodate">No date</span>
+            <div class="contract-detail">Add contract start date<br>to enable risk scoring</div>`;
+  }
+
+  let statusHtml = '';
+  let detailHtml = '';
+  const ageHtml  = `<div class="contract-age">Started ${d.contract_start_date} · Age ${fmtAge(d.age_months)}</div>`;
+
+  if (!d.rental_period || d.rental_period === '') {
+    statusHtml = `<span class="contract-status status-nodate">No rental</span>`;
+    detailHtml = `<div class="contract-detail">No rental period set</div>`;
+  } else if (d.rental_period === 'Evergreen') {
+    statusHtml = `<span class="contract-status status-evergreen">Evergreen</span>`;
+    detailHtml = `<div class="contract-detail">No expiry</div>`;
+  } else if (d.is_expired) {
+    statusHtml = `<span class="contract-status status-expired">Expired</span>`;
+    detailHtml = `<div class="contract-detail">Expired ${d.months_expired}mo ago · ${d.rental_period}mo period</div>`;
+  } else if (d.months_to_expiry != null && d.months_to_expiry <= 6) {
+    statusHtml = `<span class="contract-status status-expiring">Expiring ${d.months_to_expiry}mo</span>`;
+    detailHtml = `<div class="contract-detail">Expires ${d.expiry_date} · ${d.rental_period}mo period</div>`;
+  } else {
+    statusHtml = `<span class="contract-status status-active">${d.months_to_expiry}mo left</span>`;
+    detailHtml = `<div class="contract-detail">Expires ${d.expiry_date} · ${d.rental_period}mo period</div>`;
+  }
+
+  return statusHtml + detailHtml + ageHtml;
+}
+
+function deltaCell(d) {
+  if (!d.is_expired) {
+    if (d.months_to_expiry != null && d.months_to_expiry <= 6) {
+      const projectedLoss = (d.rental_amount || 0) * 0.75 - (d.monthly_click_rev || 0) * 0.15;
+      return `<div class="delta-na">Projected loss on expiry:</div>
+              <div class="delta-neg">−${fmtMoney(Math.abs(projectedLoss))}</div>`;
+    }
+    return `<span class="delta-na">—</span>`;
+  }
+  const loss = d.revenue_delta || 0;
+  const cls  = loss < 0 ? 'delta-neg' : 'delta-pos';
+  return `<div class="${cls}">${loss < 0 ? '−' : '+'}${fmtMoney(Math.abs(loss))}/mo</div>
+          <div style="font-size:10px; color:var(--muted); margin-top:2px;">vs pre-expiry</div>`;
+}
+
+function projectionsCell(d) {
+  if (!d.projections || !d.projections.length) {
+    return '<span style="font-size:11px; color:var(--muted2);">—</span>';
+  }
+  const base    = d.monthly_total_rev || 0;
+  const rows    = d.projections.map((p, i) => {
+    const diff  = p - base;
+    const cls   = diff > 0 ? 'proj-up' : diff < 0 ? 'proj-down' : 'proj-flat';
+    const arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : '→';
+    return `<div class="proj-item">
+      <span class="proj-label">+${i + 1}yr</span>
+      <span class="proj-val ${cls}">${arrow} ${fmtMoney(p)}</span>
+    </div>`;
+  }).join('');
+  return `<div class="proj-row">${rows}</div>`;
+}
+
+function actionCell(d) {
+  const cls = d.risk_band === 'high'   ? 'action-replace' :
+              d.risk_band === 'medium' ? 'action-review'  : 'action-keep';
+  return `<span class="action-badge ${cls}">${escHtml(d.action)}</span>`;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Sorting ───────────────────────────────────────────────────────────────────
+document.querySelectorAll('#device-table th.sortable').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.sort;
+    if (sortKey === key) {
+      sortDir = sortDir === 'desc' ? 'asc' : 'desc';
+    } else {
+      sortKey = key;
+      sortDir = 'desc';
+    }
+    renderTable();
+  });
+});
+
+// ── Filters ───────────────────────────────────────────────────────────────────
+document.getElementById('risk-chips').addEventListener('click', e => {
+  const chip = e.target.closest('[data-risk]');
+  if (!chip) return;
+  document.querySelectorAll('#risk-chips .chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+  riskFilter = chip.dataset.risk;
+  renderTable();
+});
+
+document.getElementById('status-chips').addEventListener('click', e => {
+  const chip = e.target.closest('[data-status]');
+  if (!chip) return;
+  document.querySelectorAll('#status-chips .chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+  statusFilter = chip.dataset.status;
+  renderTable();
+});
+
+document.getElementById('filter-search').addEventListener('input', renderTable);
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadClients();
+</script>
+</body>
+</html>

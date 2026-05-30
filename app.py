@@ -1,7 +1,9 @@
+import calendar
 import csv
 import io
 import os
 import uuid
+from datetime import date
 from pathlib import Path
 from flask import Flask, jsonify, request, send_from_directory, abort
 
@@ -17,6 +19,8 @@ app = Flask(__name__, static_folder='static', static_url_path='')
 
 
 # ── Database ──────────────────────────────────────────────────────────────────
+# init_db() is called unconditionally at module load so it runs whether the app
+# is started via __main__ or imported (e.g. by a WSGI server or test harness).
 
 def get_db():
     import sqlite3
@@ -131,6 +135,8 @@ def init_db():
             db.execute('ALTER TABLE devices ADD COLUMN rental_amount REAL')
         if 'rental_period' not in cols:
             db.execute("ALTER TABLE devices ADD COLUMN rental_period TEXT")
+        if 'contract_start_date' not in cols:
+            db.execute("ALTER TABLE devices ADD COLUMN contract_start_date TEXT")
         bcols = [r[1] for r in db.execute('PRAGMA table_info(buildings)').fetchall()]
         if 'lat' not in bcols:
             db.execute('ALTER TABLE buildings ADD COLUMN lat REAL')
@@ -338,6 +344,9 @@ def init_db():
                 ''', (brand_id, model_name, brand_id, model_name))
 
 
+init_db()
+
+
 def floor_label(level):
     if level == 0: return 'Ground'
     if level > 0:  return f'+{level}'
@@ -365,6 +374,10 @@ def reports_page():
 @app.route('/admin')
 def admin():
     return send_from_directory('static', 'admin.html')
+
+@app.route('/lifecycle')
+def lifecycle_page():
+    return send_from_directory('static', 'lifecycle.html')
 
 
 # ── Brands & Models ───────────────────────────────────────────────────────────
@@ -822,7 +835,7 @@ def update_device(device_id):
         db.execute('''
             UPDATE devices
             SET floor_id=?, type=?, label=?, brand=?, model=?, serial=?, notes=?, avg_mono=?, avg_colour=?,
-                mono_rate=?, colour_rate=?, rental_amount=?, rental_period=?, x_pct=?, y_pct=?
+                mono_rate=?, colour_rate=?, rental_amount=?, rental_period=?, contract_start_date=?, x_pct=?, y_pct=?
             WHERE id=?
         ''', (
             floor_id,
@@ -832,6 +845,7 @@ def update_device(device_id):
             d.get('avg_mono', 0), d.get('avg_colour', 0),
             d.get('mono_rate') or None, d.get('colour_rate') or None,
             d.get('rental_amount') or None, d.get('rental_period') or None,
+            d.get('contract_start_date') or None,
             d.get('x_pct'), d.get('y_pct'),
             device_id,
         ))
@@ -843,6 +857,202 @@ def delete_device(device_id):
     with get_db() as db:
         db.execute('DELETE FROM devices WHERE id = ?', (device_id,))
     return '', 204
+
+
+# ── Lifecycle engine ──────────────────────────────────────────────────────────
+
+POST_EXPIRY_RENTAL_FACTOR = 0.25   # rental drops to 25% of original on expiry
+POST_EXPIRY_CPC_UPLIFT    = 1.15   # GO recommended 15% CPC increase post-expiry
+ANNUAL_CPC_ESCALATION     = 1.06   # 6% annual CPC increase
+
+def _add_months(d, months):
+    month = d.month - 1 + months
+    year  = d.year + month // 12
+    month = month % 12 + 1
+    day   = min(d.day, calendar.monthrange(year, month)[1])
+    return date(year, month, day)
+
+def _compute_lifecycle(d, today):
+    mono_rate    = d.get('mono_rate')    or 0
+    colour_rate  = d.get('colour_rate')  or 0
+    rental       = d.get('rental_amount') or 0
+    avg_mono     = d.get('avg_mono')     or 0
+    avg_colour   = d.get('avg_colour')   or 0
+    rental_period = d.get('rental_period') or ''
+
+    # Parse contract start date
+    contract_start = None
+    if d.get('contract_start_date'):
+        try:
+            contract_start = date.fromisoformat(d['contract_start_date'])
+        except (ValueError, TypeError):
+            pass
+
+    # Age
+    age_months = 0
+    age_years  = 0.0
+    if contract_start:
+        age_months = (today.year - contract_start.year) * 12 + (today.month - contract_start.month)
+        age_years  = age_months / 12.0
+
+    # Retroactive 6% annual escalation from contract start
+    escalation_factor    = ANNUAL_CPC_ESCALATION ** age_years
+    adjusted_mono_rate   = mono_rate   * escalation_factor
+    adjusted_colour_rate = colour_rate * escalation_factor
+
+    # Rental expiry
+    is_expired       = False
+    expiry_date      = None
+    months_to_expiry = None
+    months_expired   = None
+
+    if rental_period and rental_period not in ('', 'Evergreen') and contract_start:
+        try:
+            period_months = int(rental_period)
+            expiry_date   = _add_months(contract_start, period_months)
+            diff = (today.year - expiry_date.year) * 12 + (today.month - expiry_date.month)
+            if today >= expiry_date:
+                is_expired     = True
+                months_expired = diff
+            else:
+                months_to_expiry = -diff
+        except (ValueError, TypeError):
+            pass
+
+    # Effective rates (current state)
+    if is_expired:
+        effective_rental      = rental * POST_EXPIRY_RENTAL_FACTOR
+        effective_mono_rate   = adjusted_mono_rate   * POST_EXPIRY_CPC_UPLIFT
+        effective_colour_rate = adjusted_colour_rate * POST_EXPIRY_CPC_UPLIFT
+    else:
+        effective_rental      = rental
+        effective_mono_rate   = adjusted_mono_rate
+        effective_colour_rate = adjusted_colour_rate
+
+    # Monthly revenue
+    monthly_click_rev = (avg_mono * effective_mono_rate) + (avg_colour * effective_colour_rate)
+    monthly_total_rev = monthly_click_rev + effective_rental
+
+    # Pre-expiry baseline (for revenue delta calculation)
+    pre_expiry_click_rev = (avg_mono * adjusted_mono_rate) + (avg_colour * adjusted_colour_rate)
+    pre_expiry_total_rev = pre_expiry_click_rev + rental
+    revenue_delta = round(monthly_total_rev - pre_expiry_total_rev, 2)  # negative = loss for GO
+
+    # 3-year forward projections (each year adds another 6% compounded from contract start)
+    projections = []
+    for yr in range(1, 4):
+        proj_factor      = ANNUAL_CPC_ESCALATION ** (age_years + yr)
+        proj_mono_rate   = mono_rate   * proj_factor
+        proj_colour_rate = colour_rate * proj_factor
+        proj_date        = date(today.year + yr, today.month, min(today.day, 28))
+        proj_expired     = is_expired or (expiry_date is not None and proj_date >= expiry_date)
+        if proj_expired:
+            proj_rental      = rental * POST_EXPIRY_RENTAL_FACTOR
+            proj_mono_rate   *= POST_EXPIRY_CPC_UPLIFT
+            proj_colour_rate *= POST_EXPIRY_CPC_UPLIFT
+        else:
+            proj_rental = rental
+        proj_click = (avg_mono * proj_mono_rate) + (avg_colour * proj_colour_rate)
+        projections.append(round(proj_click + proj_rental, 2))
+
+    # ── Risk score ────────────────────────────────────────────────────────────
+    # Age component (0–30 pts)
+    if   age_months >= 72: age_score = 30
+    elif age_months >= 60: age_score = 25
+    elif age_months >= 48: age_score = 20
+    elif age_months >= 36: age_score = 15
+    elif age_months >= 24: age_score = 10
+    elif age_months >= 12: age_score =  5
+    else:                  age_score =  0
+
+    # Expiry component (0–35 pts)
+    if is_expired:
+        expiry_score = 35
+    elif months_to_expiry is not None:
+        if   months_to_expiry <= 3:  expiry_score = 25
+        elif months_to_expiry <= 6:  expiry_score = 20
+        elif months_to_expiry <= 12: expiry_score = 10
+        else:                        expiry_score =  0
+    else:
+        expiry_score = 0
+
+    # Revenue delta component (0–20 pts) — post-expiry revenue loss as % of baseline
+    if is_expired and pre_expiry_total_rev > 0:
+        loss_pct = abs(revenue_delta) / pre_expiry_total_rev * 100
+        if   loss_pct >= 50: rev_score = 20
+        elif loss_pct >= 30: rev_score = 15
+        elif loss_pct >= 15: rev_score = 10
+        else:                rev_score =  5
+    else:
+        rev_score = 0
+
+    # Volume/CPC trend component (0–15 pts)
+    total_clicks = avg_mono + avg_colour
+    if   total_clicks >= 10000: vol_score = 15
+    elif total_clicks >= 5000:  vol_score = 10
+    elif total_clicks >= 2000:  vol_score =  5
+    else:                       vol_score =  0
+
+    risk_score = age_score + expiry_score + rev_score + vol_score
+
+    if   risk_score >= 56: risk_band = 'high'
+    elif risk_score >= 26: risk_band = 'medium'
+    else:                  risk_band = 'low'
+
+    actions = {
+        'high':   'Replace or renegotiate contract',
+        'medium': 'Review on next service call',
+        'low':    'No action required',
+    }
+
+    return {
+        **d,
+        'age_months':            age_months,
+        'age_years':             round(age_years, 1),
+        'expiry_date':           expiry_date.isoformat() if expiry_date else None,
+        'is_expired':            is_expired,
+        'months_to_expiry':      months_to_expiry,
+        'months_expired':        months_expired,
+        'escalation_factor':     round(escalation_factor, 4),
+        'adjusted_mono_rate':    round(adjusted_mono_rate, 4),
+        'adjusted_colour_rate':  round(adjusted_colour_rate, 4),
+        'effective_rental':      round(effective_rental, 2),
+        'effective_mono_rate':   round(effective_mono_rate, 4),
+        'effective_colour_rate': round(effective_colour_rate, 4),
+        'monthly_click_rev':     round(monthly_click_rev, 2),
+        'monthly_total_rev':     round(monthly_total_rev, 2),
+        'pre_expiry_total_rev':  round(pre_expiry_total_rev, 2),
+        'revenue_delta':         revenue_delta,
+        'projections':           projections,
+        'risk_score':            risk_score,
+        'risk_band':             risk_band,
+        'action':                actions[risk_band],
+        'risk_breakdown':        {
+            'age': age_score, 'expiry': expiry_score,
+            'revenue_delta': rev_score, 'volume': vol_score,
+        },
+    }
+
+@app.route('/api/clients/<int:cid>/lifecycle', methods=['GET'])
+def client_lifecycle(cid):
+    today = date.today()
+    with get_db() as db:
+        rows = db.execute('''
+            SELECT d.*,
+                   b.name  AS building_name,
+                   b.id    AS building_id,
+                   f.label AS floor_label,
+                   ci.name AS city_name
+            FROM devices d
+            JOIN floors    f  ON f.id  = d.floor_id
+            JOIN buildings b  ON b.id  = f.building_id
+            JOIN cities    ci ON ci.id = b.city_id
+            WHERE ci.client_id = ?
+            ORDER BY ci.name, b.name, f.level, d.label
+        ''', (cid,)).fetchall()
+    result = [_compute_lifecycle(dict(r), today) for r in rows]
+    result.sort(key=lambda x: x['risk_score'], reverse=True)
+    return jsonify(result)
 
 
 # ── Tree (full hierarchy + counts) ────────────────────────────────────────────
@@ -1378,6 +1588,5 @@ def _cleanup_client_files(db, client_id):
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
-    init_db()
     print('Printer Planner running at http://localhost:5050')
     app.run(host='0.0.0.0', port=5050, debug=True)

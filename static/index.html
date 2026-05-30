@@ -272,6 +272,7 @@
   <div style="margin-left:auto; display:flex; gap:8px;">
     <a id="reports-link" href="/reports" class="btn btn-neutral" style="text-decoration:none">📊 Reports</a>
     <a id="tco-link" href="/tco" class="btn btn-neutral" style="text-decoration:none">💰 TCO Calculator</a>
+    <a id="lifecycle-link" href="/lifecycle" class="btn btn-neutral" style="text-decoration:none">🔬 Lifecycle</a>
     <a id="admin-link" href="/admin" class="btn btn-neutral" style="text-decoration:none">⚙️ Admin</a>
     <button class="btn btn-ghost btn-sm theme-btn" onclick="toggleTheme()" title="Switch theme">☀</button>
   </div>
@@ -513,6 +514,10 @@
               </select>
             </div>
           </div>
+          <div class="modal-field">
+            <label>Contract Start Date</label>
+            <input type="date" class="input" id="dm-contract-start" title="Used for lifecycle risk analysis — age, expiry, and projected revenue">
+          </div>
         </div>
       </div>
 
@@ -753,9 +758,10 @@ function renderClientPanel() {
   document.getElementById('search-bar').classList.add('visible');
   document.getElementById('tree-scroll').style.display = 'block';
   document.getElementById('edit-client-btn').style.display = 'inline-flex';
-  document.getElementById('tco-link').href     = `/tco?client=${activeClient.id}`;
-  document.getElementById('reports-link').href = `/reports?client=${activeClient.id}`;
-  document.getElementById('admin-link').href   = `/admin?client=${activeClient.id}`;
+  document.getElementById('tco-link').href       = `/tco?client=${activeClient.id}`;
+  document.getElementById('reports-link').href  = `/reports?client=${activeClient.id}`;
+  document.getElementById('lifecycle-link').href = `/lifecycle?client=${activeClient.id}`;
+  document.getElementById('admin-link').href     = `/admin?client=${activeClient.id}`;
 
   // Stats
   let totalBuildings = 0, totalDevices = 0;
@@ -1376,8 +1382,9 @@ function openDeviceModal(device, floorId, container) {
   document.getElementById('dm-colour').value        = device.avg_colour  || '';
   document.getElementById('dm-mono-rate').value     = device.mono_rate   || '';
   document.getElementById('dm-colour-rate').value   = device.colour_rate || '';
-  document.getElementById('dm-rental-amount').value = device.rental_amount || '';
-  document.getElementById('dm-rental-period').value = device.rental_period || '';
+  document.getElementById('dm-rental-amount').value  = device.rental_amount  || '';
+  document.getElementById('dm-rental-period').value  = device.rental_period  || '';
+  document.getElementById('dm-contract-start').value = device.contract_start_date || '';
   document.getElementById('dm-notes').value         = device.notes       || '';
   document.getElementById('dm-brand-add-row').classList.remove('open');
   document.getElementById('dm-model-add-row').classList.remove('open');
@@ -1422,8 +1429,9 @@ document.getElementById('dm-save').addEventListener('click', async () => {
     avg_colour:     parseInt(document.getElementById('dm-colour').value)       || 0,
     mono_rate:      parseFloat(document.getElementById('dm-mono-rate').value)  || null,
     colour_rate:    parseFloat(document.getElementById('dm-colour-rate').value)|| null,
-    rental_amount:  parseFloat(document.getElementById('dm-rental-amount').value) || null,
-    rental_period:  document.getElementById('dm-rental-period').value || null,
+    rental_amount:       parseFloat(document.getElementById('dm-rental-amount').value) || null,
+    rental_period:       document.getElementById('dm-rental-period').value || null,
+    contract_start_date: document.getElementById('dm-contract-start').value || null,
     notes:          document.getElementById('dm-notes').value.trim(),
     x_pct:          floorChanged ? 0 : device.x_pct,
     y_pct:          floorChanged ? 0 : device.y_pct,

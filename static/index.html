@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Asset Planner</title>
   <script src="theme.js"></script>
+  <script src="date-utils.js"></script>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
@@ -516,7 +517,7 @@
           </div>
           <div class="modal-field">
             <label>Contract Start Date</label>
-            <input type="date" class="input" id="dm-contract-start" title="Used for lifecycle risk analysis — age, expiry, and projected revenue">
+            <input type="text" class="input" id="dm-contract-start" title="Used for lifecycle risk analysis — age, expiry, and projected revenue">
           </div>
         </div>
       </div>
@@ -1384,7 +1385,7 @@ function openDeviceModal(device, floorId, container) {
   document.getElementById('dm-colour-rate').value   = device.colour_rate || '';
   document.getElementById('dm-rental-amount').value  = device.rental_amount  || '';
   document.getElementById('dm-rental-period').value  = device.rental_period  || '';
-  document.getElementById('dm-contract-start').value = device.contract_start_date || '';
+  document.getElementById('dm-contract-start').value = fmtDate(device.contract_start_date);
   document.getElementById('dm-notes').value         = device.notes       || '';
   document.getElementById('dm-brand-add-row').classList.remove('open');
   document.getElementById('dm-model-add-row').classList.remove('open');
@@ -1431,7 +1432,7 @@ document.getElementById('dm-save').addEventListener('click', async () => {
     colour_rate:    parseFloat(document.getElementById('dm-colour-rate').value)|| null,
     rental_amount:       parseFloat(document.getElementById('dm-rental-amount').value) || null,
     rental_period:       document.getElementById('dm-rental-period').value || null,
-    contract_start_date: document.getElementById('dm-contract-start').value || null,
+    contract_start_date: toISO(document.getElementById('dm-contract-start').value),
     notes:          document.getElementById('dm-notes').value.trim(),
     x_pct:          floorChanged ? 0 : device.x_pct,
     y_pct:          floorChanged ? 0 : device.y_pct,
@@ -1619,6 +1620,7 @@ loadClients().then(() => {
   if (returnClient) selectClientById(returnClient);
 });
 loadDeviceCatalogue();
+bindDateInput(document.getElementById('dm-contract-start'));
 </script>
 </body>
 </html>

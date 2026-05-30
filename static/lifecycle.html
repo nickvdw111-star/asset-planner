@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Lifecycle & Risk — Asset Planner</title>
   <script src="theme.js"></script>
+  <script src="date-utils.js"></script>
   <link rel="stylesheet" href="style.css">
   <style>
     body { display: flex; flex-direction: column; min-height: 100vh; }
@@ -340,7 +341,7 @@
     <div class="modal-section-label">Contract</div>
     <div class="modal-field">
       <label>Contract Start Date</label>
-      <input type="date" class="input" id="em-contract-start">
+      <input type="text" class="input" id="em-contract-start">
     </div>
     <div class="modal-row">
       <div class="modal-field">
@@ -632,7 +633,7 @@ function contractCell(d) {
 
   let statusHtml = '';
   let detailHtml = '';
-  const ageHtml  = `<div class="contract-age">Started ${d.contract_start_date} · Age ${fmtAge(d.age_months)}</div>`;
+  const ageHtml  = `<div class="contract-age">Started ${fmtDate(d.contract_start_date)} · Age ${fmtAge(d.age_months)}</div>`;
 
   if (!d.rental_period || d.rental_period === '') {
     statusHtml = `<span class="contract-status status-nodate">No rental</span>`;
@@ -642,13 +643,13 @@ function contractCell(d) {
     detailHtml = `<div class="contract-detail">No expiry</div>`;
   } else if (d.is_expired) {
     statusHtml = `<span class="contract-status status-expired">Expired</span>`;
-    detailHtml = `<div class="contract-detail">Expired ${d.months_expired}mo ago · ${d.rental_period}mo period</div>`;
+    detailHtml = `<div class="contract-detail">Expired ${fmtDate(d.expiry_date)} · ${d.months_expired}mo ago</div>`;
   } else if (d.months_to_expiry != null && d.months_to_expiry <= 6) {
     statusHtml = `<span class="contract-status status-expiring">Expiring ${d.months_to_expiry}mo</span>`;
-    detailHtml = `<div class="contract-detail">Expires ${d.expiry_date} · ${d.rental_period}mo period</div>`;
+    detailHtml = `<div class="contract-detail">Expires ${fmtDate(d.expiry_date)} · ${d.rental_period}mo period</div>`;
   } else {
     statusHtml = `<span class="contract-status status-active">${d.months_to_expiry}mo left</span>`;
-    detailHtml = `<div class="contract-detail">Expires ${d.expiry_date} · ${d.rental_period}mo period</div>`;
+    detailHtml = `<div class="contract-detail">Expires ${fmtDate(d.expiry_date)} · ${d.rental_period}mo period</div>`;
   }
 
   return statusHtml + detailHtml + ageHtml;
@@ -756,7 +757,7 @@ let editTarget = null;
 function openEditModal(d) {
   editTarget = d;
   document.getElementById('edit-modal-title').textContent = `✏️ ${d.label || 'Device'}`;
-  document.getElementById('em-contract-start').value = d.contract_start_date || '';
+  document.getElementById('em-contract-start').value = fmtDate(d.contract_start_date);
   document.getElementById('em-rental-amount').value  = d.rental_amount  || '';
   document.getElementById('em-finance-cost').value   = d.finance_cost   || '';
   document.getElementById('em-rental-period').value  = d.rental_period  || '';
@@ -804,7 +805,7 @@ document.getElementById('em-save').addEventListener('click', async () => {
       rental_amount:       parseFloat(document.getElementById('em-rental-amount').value)  || null,
       finance_cost:        parseFloat(document.getElementById('em-finance-cost').value)   || null,
       rental_period:       document.getElementById('em-rental-period').value              || null,
-      contract_start_date: document.getElementById('em-contract-start').value             || null,
+      contract_start_date: toISO(document.getElementById('em-contract-start').value),
     });
     toast(`${editTarget.label} updated`);
     closeEditModal();
@@ -818,6 +819,7 @@ document.getElementById('em-save').addEventListener('click', async () => {
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────────
+bindDateInput(document.getElementById('em-contract-start'));
 loadClients();
 </script>
 </body>

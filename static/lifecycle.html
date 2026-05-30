@@ -203,6 +203,26 @@
     /* No-data rows */
     .no-data-row td { color: var(--muted); font-style: italic; text-align: center; padding: 24px; }
 
+    /* ── Edit modal ── */
+    .modal-backdrop {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6); z-index: 1000;
+      align-items: center; justify-content: center;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border2);
+      border-radius: 12px; padding: 24px; width: 420px; max-width: 95vw;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    .modal h2 { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+    .modal-field { margin-bottom: 12px; }
+    .modal-field label { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 5px; }
+    .modal-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+    .modal-divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+    .modal-section-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted2); margin-bottom: 10px; }
+
     /* ── Modals / Toast ── */
     #toast {
       position: fixed; bottom: 24px; left: 50%;
@@ -304,10 +324,70 @@
           <th class="sortable" data-sort="revenue_delta">Rev Δ <span class="sort-arrow"></span></th>
           <th>Projections</th>
           <th>Action</th>
+          <th></th>
         </tr>
       </thead>
       <tbody id="table-body"></tbody>
     </table>
+  </div>
+</div>
+
+<!-- Edit modal -->
+<div class="modal-backdrop" id="edit-modal">
+  <div class="modal">
+    <h2 id="edit-modal-title">✏️ Edit Device</h2>
+
+    <div class="modal-section-label">Contract</div>
+    <div class="modal-field">
+      <label>Contract Start Date</label>
+      <input type="date" class="input" id="em-contract-start">
+    </div>
+    <div class="modal-row">
+      <div class="modal-field">
+        <label>Rental (R/month)</label>
+        <input type="number" class="input" id="em-rental-amount" min="0" step="0.01" placeholder="0.00">
+      </div>
+      <div class="modal-field">
+        <label>Rental Period</label>
+        <select class="input" id="em-rental-period">
+          <option value="">No rental</option>
+          <option value="12">12 months</option>
+          <option value="24">24 months</option>
+          <option value="36">36 months</option>
+          <option value="60">60 months</option>
+          <option value="72">72 months</option>
+          <option value="Evergreen">Evergreen</option>
+        </select>
+      </div>
+    </div>
+
+    <hr class="modal-divider">
+    <div class="modal-section-label">Volumes &amp; Rates</div>
+    <div class="modal-row">
+      <div class="modal-field">
+        <label>Avg Mono Vol</label>
+        <input type="number" class="input" id="em-avg-mono" min="0" placeholder="0">
+      </div>
+      <div class="modal-field">
+        <label>Avg Colour Vol</label>
+        <input type="number" class="input" id="em-avg-colour" min="0" placeholder="0">
+      </div>
+    </div>
+    <div class="modal-row">
+      <div class="modal-field">
+        <label>Mono Rate (R/page)</label>
+        <input type="number" class="input" id="em-mono-rate" min="0" step="0.001" placeholder="0.000">
+      </div>
+      <div class="modal-field">
+        <label>Colour Rate (R/page)</label>
+        <input type="number" class="input" id="em-colour-rate" min="0" step="0.001" placeholder="0.000">
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-neutral" id="em-cancel">Cancel</button>
+      <button class="btn btn-primary" id="em-save">Save &amp; Recalculate</button>
+    </div>
   </div>
 </div>
 
@@ -477,7 +557,7 @@ function renderTable() {
   tbody.innerHTML = '';
 
   if (!devices.length) {
-    tbody.innerHTML = '<tr class="no-data-row"><td colspan="8">No devices match the current filters.</td></tr>';
+    tbody.innerHTML = '<tr class="no-data-row"><td colspan="9">No devices match the current filters.</td></tr>';
     return;
   }
 
@@ -532,7 +612,9 @@ function makeRow(d) {
     <td>${deltaCell(d)}</td>
     <td>${projectionsCell(d)}</td>
     <td>${actionCell(d)}</td>
+    <td><button class="btn btn-ghost btn-sm edit-btn">✏️ Edit</button></td>
   `;
+  tr.querySelector('.edit-btn').addEventListener('click', () => openEditModal(d));
   return tr;
 }
 
@@ -642,6 +724,72 @@ document.getElementById('status-chips').addEventListener('click', e => {
 });
 
 document.getElementById('filter-search').addEventListener('input', renderTable);
+
+// ── Edit modal ────────────────────────────────────────────────────────────────
+
+let editTarget = null;
+
+function openEditModal(d) {
+  editTarget = d;
+  document.getElementById('edit-modal-title').textContent = `✏️ ${d.label || 'Device'}`;
+  document.getElementById('em-contract-start').value = d.contract_start_date || '';
+  document.getElementById('em-rental-amount').value  = d.rental_amount  || '';
+  document.getElementById('em-rental-period').value  = d.rental_period  || '';
+  document.getElementById('em-avg-mono').value        = d.avg_mono       || '';
+  document.getElementById('em-avg-colour').value      = d.avg_colour     || '';
+  document.getElementById('em-mono-rate').value       = d.mono_rate      || '';
+  document.getElementById('em-colour-rate').value     = d.colour_rate    || '';
+  document.getElementById('edit-modal').classList.add('open');
+  document.getElementById('em-contract-start').focus();
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').classList.remove('open');
+  editTarget = null;
+}
+
+document.getElementById('em-cancel').addEventListener('click', closeEditModal);
+document.getElementById('edit-modal').addEventListener('click', e => {
+  if (e.target.id === 'edit-modal') closeEditModal();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeEditModal();
+});
+
+document.getElementById('em-save').addEventListener('click', async () => {
+  if (!editTarget) return;
+  const btn = document.getElementById('em-save');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    await api('PUT', `/devices/${editTarget.id}`, {
+      floor_id:            editTarget.floor_id,
+      type:                editTarget.type,
+      label:               editTarget.label,
+      brand:               editTarget.brand,
+      model:               editTarget.model,
+      serial:              editTarget.serial,
+      notes:               editTarget.notes,
+      x_pct:               editTarget.x_pct,
+      y_pct:               editTarget.y_pct,
+      avg_mono:            parseInt(document.getElementById('em-avg-mono').value)         || 0,
+      avg_colour:          parseInt(document.getElementById('em-avg-colour').value)       || 0,
+      mono_rate:           parseFloat(document.getElementById('em-mono-rate').value)      || null,
+      colour_rate:         parseFloat(document.getElementById('em-colour-rate').value)    || null,
+      rental_amount:       parseFloat(document.getElementById('em-rental-amount').value)  || null,
+      rental_period:       document.getElementById('em-rental-period').value              || null,
+      contract_start_date: document.getElementById('em-contract-start').value             || null,
+    });
+    toast(`${editTarget.label} updated`);
+    closeEditModal();
+    await loadLifecycle(activeClientId);
+  } catch (err) {
+    toast('Error: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save & Recalculate';
+  }
+});
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 loadClients();

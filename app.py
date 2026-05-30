@@ -139,6 +139,8 @@ def init_db():
             db.execute("ALTER TABLE devices ADD COLUMN contract_start_date TEXT")
         if 'finance_cost' not in cols:
             db.execute("ALTER TABLE devices ADD COLUMN finance_cost REAL")
+        if 'flagged_for_replacement' not in cols:
+            db.execute("ALTER TABLE devices ADD COLUMN flagged_for_replacement INTEGER NOT NULL DEFAULT 0")
         bcols = [r[1] for r in db.execute('PRAGMA table_info(buildings)').fetchall()]
         if 'lat' not in bcols:
             db.execute('ALTER TABLE buildings ADD COLUMN lat REAL')
@@ -838,7 +840,7 @@ def update_device(device_id):
             UPDATE devices
             SET floor_id=?, type=?, label=?, brand=?, model=?, serial=?, notes=?, avg_mono=?, avg_colour=?,
                 mono_rate=?, colour_rate=?, rental_amount=?, rental_period=?, contract_start_date=?,
-                finance_cost=?, x_pct=?, y_pct=?
+                finance_cost=?, flagged_for_replacement=?, x_pct=?, y_pct=?
             WHERE id=?
         ''', (
             floor_id,
@@ -850,11 +852,20 @@ def update_device(device_id):
             d.get('rental_amount') or None, d.get('rental_period') or None,
             d.get('contract_start_date') or None,
             d.get('finance_cost') or None,
+            1 if d.get('flagged_for_replacement') else 0,
             d.get('x_pct'), d.get('y_pct'),
             device_id,
         ))
         row = db.execute('SELECT * FROM devices WHERE id = ?', (device_id,)).fetchone()
     return jsonify(dict(row))
+
+@app.route('/api/devices/<device_id>/flag', methods=['PATCH'])
+def flag_device(device_id):
+    flagged = 1 if (request.json or {}).get('flagged') else 0
+    with get_db() as db:
+        db.execute('UPDATE devices SET flagged_for_replacement=? WHERE id=?', (flagged, device_id))
+        row = db.execute('SELECT flagged_for_replacement FROM devices WHERE id=?', (device_id,)).fetchone()
+    return jsonify({'flagged_for_replacement': row['flagged_for_replacement']})
 
 @app.route('/api/devices/<device_id>', methods=['DELETE'])
 def delete_device(device_id):

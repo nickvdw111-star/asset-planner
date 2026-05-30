@@ -152,6 +152,15 @@
     tr.row-medium td:first-child { border-left: 3px solid #fbbf24; }
     tr.row-low    td:first-child { border-left: 3px solid #22c55e; }
 
+    /* Flagged row */
+    tr.row-flagged td { background: rgba(251,146,60,0.06); }
+    tr.row-flagged:hover td { background: rgba(251,146,60,0.12); }
+    tr.row-flagged td:first-child { border-left: 3px solid #fb923c !important; }
+
+    /* Flag checkbox */
+    .flag-cb { width: 15px; height: 15px; cursor: pointer; accent-color: #fb923c; }
+    .flag-cell { text-align: center; width: 36px; }
+
     /* Device cell */
     .dev-model  { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
     .dev-label  { font-size: 11px; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
@@ -297,6 +306,11 @@
     <div class="sc-value" id="sc-expiring">0</div>
     <div class="sc-sub">rental contracts</div>
   </div>
+  <div class="summary-card" style="border-color:#fb923c;">
+    <div class="sc-label">Flagged for Replacement</div>
+    <div class="sc-value" id="sc-flagged" style="color:#fb923c;">0</div>
+    <div class="sc-sub">devices marked for action</div>
+  </div>
   <div class="summary-card sc-green">
     <div class="sc-label">Pure Revenue / mo</div>
     <div class="sc-value" id="sc-pure-rev">R0</div>
@@ -343,6 +357,7 @@
     <table id="device-table">
       <thead>
         <tr>
+          <th style="width:36px;" title="Flagged for replacement">🚩</th>
           <th class="sortable" data-sort="risk_score">Risk <span class="sort-arrow"></span></th>
           <th class="sortable" data-sort="model">Device <span class="sort-arrow"></span></th>
           <th>Location</th>
@@ -351,6 +366,13 @@
           <th style="width:32px;"></th>
         </tr>
         <tr class="filter-row">
+          <td>
+            <select class="col-filter" id="cf-flagged" title="Filter by flag">
+              <option value="">All</option>
+              <option value="flagged">🚩 Flagged</option>
+              <option value="unflagged">Unflagged</option>
+            </select>
+          </td>
           <td>
             <select class="col-filter" id="cf-risk">
               <option value="">All risk</option>
@@ -468,6 +490,7 @@ let cfModel    = '';
 let cfCity     = '';
 let cfBuilding = '';
 let cfContract = '';
+let cfFlagged  = '';
 
 // ── API ───────────────────────────────────────────────────────────────────────
 async function api(method, path, body) {
@@ -535,7 +558,7 @@ document.getElementById('client-select').addEventListener('change', e => {
 function clearView() {
   allDevices = [];
   activeClientId = null;
-  cfRisk = cfModel = cfCity = cfBuilding = cfContract = '';
+  cfRisk = cfModel = cfCity = cfBuilding = cfContract = cfFlagged = '';
   document.getElementById('summary-cards').style.display = 'none';
   document.getElementById('filter-bar').style.display    = 'none';
   document.getElementById('device-table-wrap').style.display = 'none';
@@ -569,6 +592,8 @@ async function loadLifecycle(clientId) {
 function renderSummary() {
   const highRisk = allDevices.filter(d => d.risk_band === 'high').length;
   const expiring = allDevices.filter(d => d.months_to_expiry != null && d.months_to_expiry <= 6).length;
+  const flagged  = allDevices.filter(d => d.flagged_for_replacement).length;
+  document.getElementById('sc-flagged').textContent = flagged;
   const pureRev  = allDevices
     .filter(d => d.is_pure_revenue)
     .reduce((s, d) => s + (d.go_net || 0), 0);
@@ -605,7 +630,7 @@ function populateColumnFilters() {
 }
 
 function updateCfActiveStyles() {
-  ['cf-risk','cf-model','cf-city','cf-building','cf-contract'].forEach(id => {
+  ['cf-flagged','cf-risk','cf-model','cf-city','cf-building','cf-contract'].forEach(id => {
     const el = document.getElementById(id);
     el.classList.toggle('cf-active', el.value !== '');
   });
@@ -635,6 +660,9 @@ function getFilteredDevices() {
                : d.months_to_expiry != null ? 'active' : 'nodate';
       if (st !== cfContract) return false;
     }
+
+    if (cfFlagged === 'flagged'   && !d.flagged_for_replacement) return false;
+    if (cfFlagged === 'unflagged' &&  d.flagged_for_replacement) return false;
 
     if (q && !(
       (d.label  || '').toLowerCase().includes(q) ||
@@ -671,7 +699,7 @@ function renderTable() {
   tbody.innerHTML = '';
 
   if (!devices.length) {
-    tbody.innerHTML = '<tr class="no-data-row"><td colspan="6">No devices match the current filters.</td></tr>';
+    tbody.innerHTML = '<tr class="no-data-row"><td colspan="7">No devices match the current filters.</td></tr>';
     return;
   }
 
@@ -684,7 +712,8 @@ function renderTable() {
 
 function makeRow(d) {
   const tr = document.createElement('tr');
-  tr.className = `data-row row-${d.risk_band}`;
+  const flagged = !!d.flagged_for_replacement;
+  tr.className = `data-row row-${d.risk_band}${flagged ? ' row-flagged' : ''}`;
 
   // Contract status chip (compact)
   let statusChip = '', contractBrief = '';
@@ -721,6 +750,9 @@ function makeRow(d) {
   const modelDisplay = [d.brand, d.model].filter(Boolean).join(' ') || '—';
 
   tr.innerHTML = `
+    <td class="flag-cell">
+      <input type="checkbox" class="flag-cb" ${flagged ? 'checked' : ''} title="Flag for replacement">
+    </td>
     <td>
       <span class="risk-badge risk-${d.risk_band}">${d.risk_band}</span>
       <div class="risk-score-small">${d.risk_score}/100</div>
@@ -743,8 +775,24 @@ function makeRow(d) {
 
   const detailTr = makeDetailRow(d);
   const expandBtn = tr.querySelector('.expand-btn');
+  const flagCb    = tr.querySelector('.flag-cb');
+
+  flagCb.addEventListener('change', async e => {
+    e.stopPropagation();
+    const checked = e.target.checked;
+    try {
+      await api('PATCH', `/devices/${d.id}/flag`, { flagged: checked });
+      d.flagged_for_replacement = checked ? 1 : 0;
+      tr.classList.toggle('row-flagged', checked);
+      renderSummary();
+    } catch (err) {
+      e.target.checked = !checked;
+      toast('Could not save flag: ' + err.message);
+    }
+  });
 
   function toggle(e) {
+    if (e.target.classList.contains('flag-cb')) return;
     e.stopPropagation();
     const open = detailTr.classList.toggle('hidden');
     expandBtn.classList.toggle('open', !open);
@@ -842,7 +890,7 @@ function makeDetailRow(d) {
       </div>
     </div>`;
 
-  tr.innerHTML = `<td colspan="6"><div class="detail-panel">${col1}${col2}${col3}</div></td>`;
+  tr.innerHTML = `<td colspan="7"><div class="detail-panel">${col1}${col2}${col3}</div></td>`;
   tr.querySelector('.detail-edit-btn').addEventListener('click', e => {
     e.stopPropagation();
     openEditModal(d);
@@ -966,6 +1014,9 @@ document.getElementById('em-save').addEventListener('click', async () => {
 });
 
 // ── Column filter events ──────────────────────────────────────────────────────
+document.getElementById('cf-flagged').addEventListener('change', e => {
+  cfFlagged = e.target.value; updateCfActiveStyles(); renderTable();
+});
 document.getElementById('cf-risk').addEventListener('change', e => {
   cfRisk = e.target.value; updateCfActiveStyles(); renderTable();
 });
@@ -994,8 +1045,8 @@ document.getElementById('cf-contract').addEventListener('change', e => {
   cfContract = e.target.value; updateCfActiveStyles(); renderTable();
 });
 document.getElementById('cf-clear').addEventListener('click', () => {
-  cfRisk = cfModel = cfCity = cfBuilding = cfContract = '';
-  ['cf-risk','cf-model','cf-city','cf-building','cf-contract'].forEach(id => {
+  cfRisk = cfModel = cfCity = cfBuilding = cfContract = cfFlagged = '';
+  ['cf-flagged','cf-risk','cf-model','cf-city','cf-building','cf-contract'].forEach(id => {
     document.getElementById(id).value = '';
     document.getElementById(id).classList.remove('cf-active');
   });

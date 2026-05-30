@@ -243,6 +243,25 @@
     .locate-btn { margin-top: 6px; font-size: 11px; }
 
     #new-client-modal .modal { width: 340px; }
+
+    /* ── Search ── */
+    #search-bar { display: none; padding: 10px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    #search-bar.visible { display: block; }
+    .search-wrap { position: relative; }
+    .search-icon { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; font-size: 13px; }
+    #search-input { padding-left: 30px; padding-right: 28px; }
+    #search-clear { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 18px; cursor: pointer; display: none; line-height: 1; }
+    #search-clear.visible { display: block; }
+    #search-results { display: none; flex: 1; flex-direction: column; overflow-y: auto; }
+    #search-results.visible { display: flex; }
+    #search-count { padding: 6px 14px 4px; font-size: 11px; color: var(--muted); flex-shrink: 0; }
+    .search-empty { padding: 32px 14px; text-align: center; color: var(--muted2); font-size: 13px; }
+    .search-hit { display: flex; align-items: center; gap: 8px; padding: 8px 14px; cursor: pointer; border-bottom: 1px solid var(--border); }
+    .search-hit:hover { background: var(--surface2); }
+    .search-hit-name { flex: 1; min-width: 0; }
+    .search-hit-label { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .search-hit-meta  { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .search-hit-loc   { font-size: 10px; color: var(--muted2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
   </style>
 </head>
 <body>
@@ -279,6 +298,21 @@
         <button class="btn btn-ghost btn-sm" id="add-city-btn">+ Add City</button>
         <button class="btn btn-danger btn-sm" id="delete-client-btn">Delete Client</button>
       </div>
+    </div>
+
+    <!-- Search bar (visible when client loaded) -->
+    <div id="search-bar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="search" id="search-input" class="input" placeholder="Search by name, serial, brand or model…">
+        <span id="search-clear" title="Clear">×</span>
+      </div>
+    </div>
+
+    <!-- Search results -->
+    <div id="search-results">
+      <div id="search-count"></div>
+      <div id="search-hits"></div>
     </div>
 
     <!-- Tree (visible when client loaded) -->
@@ -507,8 +541,9 @@
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
-let allClients = [];   // [{id, name}]
-let activeClient = null; // full tree entry for selected client
+let allClients = [];         // [{id, name}]
+let activeClient = null;     // full tree entry for selected client
+let allClientDevices = [];   // flat device list for current client (search)
 
 // ── Map ───────────────────────────────────────────────────────────────────────
 
@@ -678,7 +713,12 @@ document.getElementById('client-select').addEventListener('change', async e => {
 
 function clearClient() {
   activeClient = null;
+  allClientDevices = [];
   document.getElementById('client-actions').classList.add('hidden');
+  document.getElementById('search-bar').classList.remove('visible');
+  document.getElementById('search-results').classList.remove('visible');
+  document.getElementById('search-input').value = '';
+  document.getElementById('search-clear').classList.remove('visible');
   document.getElementById('tree-scroll').style.display = 'none';
   document.getElementById('no-client-hint').classList.remove('hidden');
   document.getElementById('tree-root').innerHTML = '';
@@ -688,7 +728,10 @@ function clearClient() {
 }
 
 async function loadClientData(clientId) {
-  const tree = await api('GET', '/tree');
+  const [tree] = await Promise.all([
+    api('GET', '/tree'),
+    api('GET', `/clients/${clientId}/devices`).then(d => { allClientDevices = d; }).catch(() => { allClientDevices = []; }),
+  ]);
   activeClient = tree.find(c => c.id === clientId) || null;
   if (!activeClient) { clearClient(); return; }
   renderClientPanel();
@@ -707,6 +750,7 @@ function renderClientPanel() {
 
   document.getElementById('no-client-hint').classList.add('hidden');
   document.getElementById('client-actions').classList.remove('hidden');
+  document.getElementById('search-bar').classList.add('visible');
   document.getElementById('tree-scroll').style.display = 'block';
   document.getElementById('edit-client-btn').style.display = 'inline-flex';
   document.getElementById('tco-link').href     = `/tco?client=${activeClient.id}`;
@@ -1389,8 +1433,10 @@ document.getElementById('dm-save').addEventListener('click', async () => {
     Object.assign(device, updated);
     toast('Device saved');
     closeDeviceModal();
-    if (floorChanged) {
+    if (floorChanged || !container) {
       await loadClientData(activeClient.id);
+      const q = document.getElementById('search-input').value.trim();
+      if (q) filterDevices(q);
     } else {
       await loadFloorDevices(originalFloorId, container);
     }
@@ -1471,6 +1517,91 @@ document.getElementById('dm-save-model-btn').addEventListener('click', dmSaveMod
 document.getElementById('dm-new-model').addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.stopPropagation(); dmSaveModel(); }
   if (e.key === 'Escape') { document.getElementById('dm-model-add-row').classList.remove('open'); }
+});
+
+// ── Search ────────────────────────────────────────────────────────────────────
+
+function filterDevices(query) {
+  const q = query.trim().toLowerCase();
+  const clearBtn = document.getElementById('search-clear');
+  const resultsEl = document.getElementById('search-results');
+  const treeEl = document.getElementById('tree-scroll');
+
+  if (!q) {
+    resultsEl.classList.remove('visible');
+    treeEl.style.display = 'block';
+    clearBtn.classList.remove('visible');
+    return;
+  }
+
+  treeEl.style.display = 'none';
+  resultsEl.classList.add('visible');
+  clearBtn.classList.add('visible');
+
+  const matches = allClientDevices.filter(d =>
+    (d.label  || '').toLowerCase().includes(q) ||
+    (d.serial || '').toLowerCase().includes(q) ||
+    (d.brand  || '').toLowerCase().includes(q) ||
+    (d.model  || '').toLowerCase().includes(q)
+  );
+
+  document.getElementById('search-count').textContent =
+    `${matches.length} of ${allClientDevices.length} device${allClientDevices.length !== 1 ? 's' : ''}`;
+
+  const hits = document.getElementById('search-hits');
+  if (!matches.length) {
+    hits.innerHTML = `<div class="search-empty">No devices match "<em>${query}</em>"</div>`;
+    return;
+  }
+
+  hits.innerHTML = '';
+  matches.forEach(d => {
+    const row = document.createElement('div');
+    row.className = 'search-hit';
+
+    const icon = document.createElement('span');
+    icon.className = 'tree-icon';
+    icon.textContent = DEVICE_ICONS_MAP[d.type] || '🖨';
+
+    const nameWrap = document.createElement('div');
+    nameWrap.className = 'search-hit-name';
+
+    const labelEl = document.createElement('div');
+    labelEl.className = 'search-hit-label';
+    labelEl.textContent = d.label || 'Unnamed';
+
+    const metaEl = document.createElement('div');
+    metaEl.className = 'search-hit-meta';
+    metaEl.textContent = [d.brand, d.model].filter(Boolean).join(' · ') || '—';
+
+    const locEl = document.createElement('div');
+    locEl.className = 'search-hit-loc';
+    locEl.textContent = `${d.city_name} › ${d.building_name} › ${d.floor_label}`;
+
+    nameWrap.appendChild(labelEl);
+    nameWrap.appendChild(metaEl);
+    nameWrap.appendChild(locEl);
+
+    const serialEl = document.createElement('span');
+    const hasSerial = d.serial && d.serial.trim();
+    serialEl.className = 'device-serial' + (hasSerial ? '' : ' empty');
+    serialEl.textContent = hasSerial ? d.serial : 'No serial';
+
+    row.appendChild(icon);
+    row.appendChild(nameWrap);
+    row.appendChild(serialEl);
+
+    row.addEventListener('click', () => openDeviceModal(d, d.floor_id, null));
+    hits.appendChild(row);
+  });
+}
+
+document.getElementById('search-input').addEventListener('input', e => filterDevices(e.target.value));
+
+document.getElementById('search-clear').addEventListener('click', () => {
+  document.getElementById('search-input').value = '';
+  filterDevices('');
+  document.getElementById('search-input').focus();
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────────

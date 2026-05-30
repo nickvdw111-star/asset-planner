@@ -91,6 +91,24 @@ body {
 .input:focus { border-color: var(--accent-h); }
 textarea.input { resize: vertical; min-height: 64px; }
 
+/* ── Split date input ── */
+.date-input-group {
+  display: flex; align-items: center;
+  background: var(--bg); border: 1px solid var(--border2);
+  border-radius: 6px; padding: 7px 10px; width: 100%; gap: 2px;
+  transition: border-color 0.15s;
+}
+.date-input-group:focus-within { border-color: var(--accent-h); }
+.date-part {
+  border: none; background: transparent; color: var(--text);
+  font-size: 13px; font-family: inherit; outline: none;
+  text-align: center; min-width: 0;
+}
+.date-part.dp-dd, .date-part.dp-mm { width: 26px; }
+.date-part.dp-yyyy { width: 42px; }
+.date-part::placeholder { color: var(--muted2); }
+.date-sep { color: var(--muted); user-select: none; padding: 0 1px; font-size: 13px; }
+
 /* ── Badge ── */
 .badge {
   display: inline-flex;

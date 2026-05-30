@@ -350,7 +350,7 @@
     <div class="modal-section-label">Contract</div>
     <div class="modal-field">
       <label>Contract Start Date</label>
-      <input type="text" class="input" id="em-contract-start">
+      <div id="em-contract-start"></div>
     </div>
     <div class="modal-row">
       <div class="modal-field">
@@ -806,7 +806,7 @@ let editTarget = null;
 function openEditModal(d) {
   editTarget = d;
   document.getElementById('edit-modal-title').textContent = `✏️ ${d.label || 'Device'}`;
-  document.getElementById('em-contract-start').value = fmtDate(d.contract_start_date);
+  setDateValue(document.getElementById('em-contract-start'), d.contract_start_date);
   document.getElementById('em-rental-amount').value  = d.rental_amount  || '';
   document.getElementById('em-finance-cost').value   = d.finance_cost   || '';
   document.getElementById('em-rental-period').value  = d.rental_period  || '';
@@ -854,7 +854,7 @@ document.getElementById('em-save').addEventListener('click', async () => {
       rental_amount:       parseFloat(document.getElementById('em-rental-amount').value)  || null,
       finance_cost:        parseFloat(document.getElementById('em-finance-cost').value)   || null,
       rental_period:       document.getElementById('em-rental-period').value              || null,
-      contract_start_date: toISO(document.getElementById('em-contract-start').value),
+      contract_start_date: getDateValue(document.getElementById('em-contract-start')),
     });
     toast(`${editTarget.label} updated`);
     closeEditModal();
@@ -868,7 +868,7 @@ document.getElementById('em-save').addEventListener('click', async () => {
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-bindDateInput(document.getElementById('em-contract-start'));
+buildDateInput(document.getElementById('em-contract-start'));
 loadClients();
 </script>
 </body>

@@ -117,6 +117,20 @@
     #device-table th.sort-desc .sort-arrow::after { content: '▼'; }
     #device-table th:not(.sort-asc):not(.sort-desc) .sort-arrow::after { content: '⇅'; }
 
+    /* ── Column filters ── */
+    tr.filter-row td {
+      padding: 4px 12px 6px; background: var(--surface);
+      border-bottom: 2px solid var(--border2);
+    }
+    .col-filter {
+      width: 100%; background: var(--bg); border: 1px solid var(--border2);
+      border-radius: 5px; color: var(--text); font-size: 11px;
+      padding: 4px 6px; outline: none; cursor: pointer; font-family: inherit;
+    }
+    .col-filter:focus { border-color: var(--accent-h); }
+    .col-filter option { background: var(--surface2); }
+    .cf-active { border-color: var(--accent-h) !important; color: var(--accent-h); }
+
     /* Compact data rows */
     tr.data-row td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
     tr.data-row { cursor: pointer; }
@@ -336,6 +350,37 @@
           <th class="sortable" data-sort="go_net">GO Net / mo <span class="sort-arrow"></span></th>
           <th style="width:32px;"></th>
         </tr>
+        <tr class="filter-row">
+          <td>
+            <select class="col-filter" id="cf-risk">
+              <option value="">All risk</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </td>
+          <td>
+            <select class="col-filter" id="cf-model"><option value="">All models</option></select>
+          </td>
+          <td style="display:flex; gap:4px;">
+            <select class="col-filter" id="cf-city"><option value="">All cities</option></select>
+            <select class="col-filter" id="cf-building"><option value="">All buildings</option></select>
+          </td>
+          <td>
+            <select class="col-filter" id="cf-contract">
+              <option value="">All statuses</option>
+              <option value="expired">Expired</option>
+              <option value="expiring">Expiring ≤6mo</option>
+              <option value="active">Active</option>
+              <option value="evergreen">Evergreen</option>
+              <option value="nodate">No date set</option>
+            </select>
+          </td>
+          <td></td>
+          <td style="text-align:right; padding-right:8px;">
+            <button class="btn btn-ghost btn-sm" id="cf-clear" title="Clear all filters">✕</button>
+          </td>
+        </tr>
       </thead>
       <tbody id="table-body"></tbody>
     </table>
@@ -417,6 +462,12 @@ let riskFilter     = 'all';
 let statusFilter   = 'all';
 let sortKey        = 'risk_score';
 let sortDir        = 'desc';
+// Column filters
+let cfRisk     = '';
+let cfModel    = '';
+let cfCity     = '';
+let cfBuilding = '';
+let cfContract = '';
 
 // ── API ───────────────────────────────────────────────────────────────────────
 async function api(method, path, body) {
@@ -484,6 +535,7 @@ document.getElementById('client-select').addEventListener('change', e => {
 function clearView() {
   allDevices = [];
   activeClientId = null;
+  cfRisk = cfModel = cfCity = cfBuilding = cfContract = '';
   document.getElementById('summary-cards').style.display = 'none';
   document.getElementById('filter-bar').style.display    = 'none';
   document.getElementById('device-table-wrap').style.display = 'none';
@@ -504,6 +556,7 @@ async function loadLifecycle(clientId) {
     document.getElementById('filter-bar').style.display    = 'flex';
     document.getElementById('device-table-wrap').style.display = 'block';
     renderSummary();
+    populateColumnFilters();
     renderTable();
   } catch (err) {
     document.getElementById('loading').classList.remove('visible');
@@ -529,15 +582,60 @@ function renderSummary() {
     `${allDevices.length} device${allDevices.length !== 1 ? 's' : ''}`;
 }
 
+// ── Column filter population ──────────────────────────────────────────────────
+function populateColumnFilters() {
+  function repopulate(selId, values, current, placeholder) {
+    const sel = document.getElementById(selId);
+    sel.innerHTML = `<option value="">${placeholder}</option>`;
+    values.forEach(v => {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = v;
+      if (v === current) o.selected = true;
+      sel.appendChild(o);
+    });
+  }
+
+  const models    = [...new Set(allDevices.map(d => [d.brand, d.model].filter(Boolean).join(' ') || '—').filter(Boolean))].sort();
+  const cities    = [...new Set(allDevices.map(d => d.city_name    || '').filter(Boolean))].sort();
+  const buildings = [...new Set(allDevices.map(d => d.building_name || '').filter(Boolean))].sort();
+
+  repopulate('cf-model',    models,    cfModel,    'All models');
+  repopulate('cf-city',     cities,    cfCity,     'All cities');
+  repopulate('cf-building', buildings, cfBuilding, 'All buildings');
+}
+
+function updateCfActiveStyles() {
+  ['cf-risk','cf-model','cf-city','cf-building','cf-contract'].forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.toggle('cf-active', el.value !== '');
+  });
+}
+
 // ── Table rendering ───────────────────────────────────────────────────────────
 function getFilteredDevices() {
   const q = document.getElementById('filter-search').value.trim().toLowerCase();
   return allDevices.filter(d => {
+    // Top-bar chips (kept for backwards compat but cf-risk now also works)
     if (riskFilter !== 'all' && d.risk_band !== riskFilter) return false;
     if (statusFilter === 'expired'  && !d.is_expired) return false;
     if (statusFilter === 'expiring' && !(d.months_to_expiry != null && d.months_to_expiry <= 6)) return false;
     if (statusFilter === 'active'   && !(d.months_to_expiry != null && d.months_to_expiry > 6)) return false;
     if (statusFilter === 'nodate'   && d.contract_start_date) return false;
+
+    // Column filters
+    if (cfRisk     && d.risk_band !== cfRisk) return false;
+    if (cfModel    && ([d.brand, d.model].filter(Boolean).join(' ') || '—') !== cfModel) return false;
+    if (cfCity     && (d.city_name     || '') !== cfCity)     return false;
+    if (cfBuilding && (d.building_name || '') !== cfBuilding) return false;
+    if (cfContract) {
+      const st = d.is_expired ? 'expired'
+               : d.months_to_expiry != null && d.months_to_expiry <= 6 ? 'expiring'
+               : d.rental_period === 'Evergreen' ? 'evergreen'
+               : !d.contract_start_date ? 'nodate'
+               : d.months_to_expiry != null ? 'active' : 'nodate';
+      if (st !== cfContract) return false;
+    }
+
     if (q && !(
       (d.label  || '').toLowerCase().includes(q) ||
       (d.serial || '').toLowerCase().includes(q)
@@ -865,6 +963,43 @@ document.getElementById('em-save').addEventListener('click', async () => {
     btn.disabled = false;
     btn.textContent = 'Save & Recalculate';
   }
+});
+
+// ── Column filter events ──────────────────────────────────────────────────────
+document.getElementById('cf-risk').addEventListener('change', e => {
+  cfRisk = e.target.value; updateCfActiveStyles(); renderTable();
+});
+document.getElementById('cf-model').addEventListener('change', e => {
+  cfModel = e.target.value; updateCfActiveStyles(); renderTable();
+});
+document.getElementById('cf-city').addEventListener('change', e => {
+  cfCity = e.target.value;
+  // Reset building filter when city changes
+  cfBuilding = ''; document.getElementById('cf-building').value = '';
+  // Narrow building options to selected city
+  if (cfCity) {
+    const buildings = [...new Set(allDevices.filter(d => d.city_name === cfCity).map(d => d.building_name || '').filter(Boolean))].sort();
+    const sel = document.getElementById('cf-building');
+    sel.innerHTML = '<option value="">All buildings</option>';
+    buildings.forEach(b => { const o = document.createElement('option'); o.value = b; o.textContent = b; sel.appendChild(o); });
+  } else {
+    populateColumnFilters();
+  }
+  updateCfActiveStyles(); renderTable();
+});
+document.getElementById('cf-building').addEventListener('change', e => {
+  cfBuilding = e.target.value; updateCfActiveStyles(); renderTable();
+});
+document.getElementById('cf-contract').addEventListener('change', e => {
+  cfContract = e.target.value; updateCfActiveStyles(); renderTable();
+});
+document.getElementById('cf-clear').addEventListener('click', () => {
+  cfRisk = cfModel = cfCity = cfBuilding = cfContract = '';
+  ['cf-risk','cf-model','cf-city','cf-building','cf-contract'].forEach(id => {
+    document.getElementById(id).value = '';
+    document.getElementById(id).classList.remove('cf-active');
+  });
+  renderTable();
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────────

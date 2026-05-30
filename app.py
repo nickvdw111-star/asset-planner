@@ -1315,12 +1315,22 @@ def import_devices():
 
             # Insert device
             rental_period = row.get('rental_period', '').strip() or None
+            csd_raw = row.get('contract_start_date', '').strip()
+            contract_start_date = None
+            if csd_raw:
+                try:
+                    date.fromisoformat(csd_raw)
+                    contract_start_date = csd_raw
+                except ValueError:
+                    errors.append({'row': row_num, 'type': 'invalid_date',
+                                   'detail': f"contract_start_date must be YYYY-MM-DD, got: '{csd_raw}'"})
+                    continue
             db.execute('''
                 INSERT INTO devices
                     (id, floor_id, type, label, brand, model, serial, notes,
                      avg_mono, avg_colour, mono_rate, colour_rate,
-                     rental_amount, rental_period, x_pct, y_pct)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)
+                     rental_amount, rental_period, contract_start_date, x_pct, y_pct)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)
             ''', (
                 str(uuid.uuid4()),
                 floor_id,
@@ -1336,6 +1346,7 @@ def import_devices():
                 _safe_float(row.get('colour_rate')),
                 _safe_float(row.get('rental_amount')),
                 rental_period,
+                contract_start_date,
             ))
             imported += 1
 

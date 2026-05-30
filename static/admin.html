@@ -738,12 +738,12 @@ function downloadTemplate() {
   const headers = [
     'client','city','building','floor_level','floor_label',
     'device_type','label','brand','model','serial','notes',
-    'avg_mono','avg_colour','mono_rate','colour_rate','rental_amount','rental_period'
+    'avg_mono','avg_colour','mono_rate','colour_rate','rental_amount','rental_period','contract_start_date'
   ];
   const example = [
     'Acme Corp','Johannesburg','Head Office','0','Ground',
     'mfp','Reception MFP','Ricoh','IM C2000','ABC12345','Main entrance',
-    '5000','500','0.08','0.45','1500','36'
+    '5000','500','0.08','0.45','1500','36','2023-01-15'
   ];
   const csv = [headers.join(','), example.join(',')].join('\r\n');
   const blob = new Blob([csv], { type: 'text/csv' });

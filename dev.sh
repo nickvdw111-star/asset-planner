@@ -20,7 +20,8 @@ fi
 cd "$(dirname "$0")"
 source venv/bin/activate 2>/dev/null || true
 
-echo "Starting PrintMap dev server on :5050..."
+export DATA_DIR="$(pwd)/data"
+echo "Starting PrintMap dev server on :5050 (data: $DATA_DIR)..."
 python3 app.py &
 echo $! > "$PIDFILE"
 echo "PID $(cat $PIDFILE). Stop with: ./dev.sh stop"

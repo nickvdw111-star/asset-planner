@@ -137,6 +137,8 @@ def init_db():
             db.execute("ALTER TABLE devices ADD COLUMN rental_period TEXT")
         if 'contract_start_date' not in cols:
             db.execute("ALTER TABLE devices ADD COLUMN contract_start_date TEXT")
+        if 'finance_cost' not in cols:
+            db.execute("ALTER TABLE devices ADD COLUMN finance_cost REAL")
         bcols = [r[1] for r in db.execute('PRAGMA table_info(buildings)').fetchall()]
         if 'lat' not in bcols:
             db.execute('ALTER TABLE buildings ADD COLUMN lat REAL')
@@ -835,7 +837,8 @@ def update_device(device_id):
         db.execute('''
             UPDATE devices
             SET floor_id=?, type=?, label=?, brand=?, model=?, serial=?, notes=?, avg_mono=?, avg_colour=?,
-                mono_rate=?, colour_rate=?, rental_amount=?, rental_period=?, contract_start_date=?, x_pct=?, y_pct=?
+                mono_rate=?, colour_rate=?, rental_amount=?, rental_period=?, contract_start_date=?,
+                finance_cost=?, x_pct=?, y_pct=?
             WHERE id=?
         ''', (
             floor_id,
@@ -846,6 +849,7 @@ def update_device(device_id):
             d.get('mono_rate') or None, d.get('colour_rate') or None,
             d.get('rental_amount') or None, d.get('rental_period') or None,
             d.get('contract_start_date') or None,
+            d.get('finance_cost') or None,
             d.get('x_pct'), d.get('y_pct'),
             device_id,
         ))
@@ -873,12 +877,13 @@ def _add_months(d, months):
     return date(year, month, day)
 
 def _compute_lifecycle(d, today):
-    mono_rate    = d.get('mono_rate')    or 0
-    colour_rate  = d.get('colour_rate')  or 0
-    rental       = d.get('rental_amount') or 0
-    avg_mono     = d.get('avg_mono')     or 0
-    avg_colour   = d.get('avg_colour')   or 0
+    mono_rate     = d.get('mono_rate')     or 0
+    colour_rate   = d.get('colour_rate')   or 0
+    rental        = d.get('rental_amount') or 0
+    avg_mono      = d.get('avg_mono')      or 0
+    avg_colour    = d.get('avg_colour')    or 0
     rental_period = d.get('rental_period') or ''
+    finance_cost  = d.get('finance_cost')  or 0   # monthly bank repayment on the asset
 
     # Parse contract start date
     contract_start = None
@@ -919,7 +924,7 @@ def _compute_lifecycle(d, today):
         except (ValueError, TypeError):
             pass
 
-    # Effective rates (current state)
+    # Effective billing rates (what the client is charged)
     if is_expired:
         effective_rental      = rental * POST_EXPIRY_RENTAL_FACTOR
         effective_mono_rate   = adjusted_mono_rate   * POST_EXPIRY_CPC_UPLIFT
@@ -929,16 +934,16 @@ def _compute_lifecycle(d, today):
         effective_mono_rate   = adjusted_mono_rate
         effective_colour_rate = adjusted_colour_rate
 
-    # Monthly revenue
+    # Monthly billing (what the client pays)
     monthly_click_rev = (avg_mono * effective_mono_rate) + (avg_colour * effective_colour_rate)
     monthly_total_rev = monthly_click_rev + effective_rental
 
-    # Pre-expiry baseline (for revenue delta calculation)
-    pre_expiry_click_rev = (avg_mono * adjusted_mono_rate) + (avg_colour * adjusted_colour_rate)
-    pre_expiry_total_rev = pre_expiry_click_rev + rental
-    revenue_delta = round(monthly_total_rev - pre_expiry_total_rev, 2)  # negative = loss for GO
+    # GO Net = what GO actually keeps
+    # During contract: billing minus bank finance repayment on the asset
+    # After expiry:    full billing is pure revenue — asset is owned outright, no finance obligation
+    go_net = round(monthly_total_rev - (0.0 if is_expired else finance_cost), 2)
 
-    # 3-year forward projections (each year adds another 6% compounded from contract start)
+    # 3-year forward projections showing GO net per year
     projections = []
     for yr in range(1, 4):
         proj_factor      = ANNUAL_CPC_ESCALATION ** (age_years + yr)
@@ -952,8 +957,13 @@ def _compute_lifecycle(d, today):
             proj_colour_rate *= POST_EXPIRY_CPC_UPLIFT
         else:
             proj_rental = rental
-        proj_click = (avg_mono * proj_mono_rate) + (avg_colour * proj_colour_rate)
-        projections.append(round(proj_click + proj_rental, 2))
+        proj_billing = (avg_mono * proj_mono_rate) + (avg_colour * proj_colour_rate) + proj_rental
+        proj_net     = proj_billing - (0.0 if proj_expired else finance_cost)
+        projections.append({
+            'billing':  round(proj_billing, 2),
+            'go_net':   round(proj_net, 2),
+            'is_pure':  proj_expired,
+        })
 
     # ── Risk score ────────────────────────────────────────────────────────────
     # Age component (0–30 pts)
@@ -976,15 +986,17 @@ def _compute_lifecycle(d, today):
     else:
         expiry_score = 0
 
-    # Revenue delta component (0–20 pts) — post-expiry revenue loss as % of baseline
-    if is_expired and pre_expiry_total_rev > 0:
-        loss_pct = abs(revenue_delta) / pre_expiry_total_rev * 100
-        if   loss_pct >= 50: rev_score = 20
-        elif loss_pct >= 30: rev_score = 15
-        elif loss_pct >= 15: rev_score = 10
-        else:                rev_score =  5
+    # Margin health component (0–20 pts)
+    # Thin GO net margin while in-contract signals a financially stressed device.
+    # Post-expiry devices score 0 here — their billing is pure margin.
+    if not is_expired and finance_cost > 0 and monthly_total_rev > 0:
+        margin_pct = go_net / monthly_total_rev * 100
+        if   margin_pct < 10: margin_score = 20
+        elif margin_pct < 20: margin_score = 15
+        elif margin_pct < 30: margin_score = 10
+        else:                 margin_score =  0
     else:
-        rev_score = 0
+        margin_score = 0
 
     # Volume/CPC trend component (0–15 pts)
     total_clicks = avg_mono + avg_colour
@@ -993,7 +1005,7 @@ def _compute_lifecycle(d, today):
     elif total_clicks >= 2000:  vol_score =  5
     else:                       vol_score =  0
 
-    risk_score = age_score + expiry_score + rev_score + vol_score
+    risk_score = age_score + expiry_score + margin_score + vol_score
 
     if   risk_score >= 56: risk_band = 'high'
     elif risk_score >= 26: risk_band = 'medium'
@@ -1021,15 +1033,16 @@ def _compute_lifecycle(d, today):
         'effective_colour_rate': round(effective_colour_rate, 4),
         'monthly_click_rev':     round(monthly_click_rev, 2),
         'monthly_total_rev':     round(monthly_total_rev, 2),
-        'pre_expiry_total_rev':  round(pre_expiry_total_rev, 2),
-        'revenue_delta':         revenue_delta,
+        'finance_cost':          round(finance_cost, 2),
+        'go_net':                go_net,
+        'is_pure_revenue':       is_expired,
         'projections':           projections,
         'risk_score':            risk_score,
         'risk_band':             risk_band,
         'action':                actions[risk_band],
         'risk_breakdown':        {
             'age': age_score, 'expiry': expiry_score,
-            'revenue_delta': rev_score, 'volume': vol_score,
+            'margin': margin_score, 'volume': vol_score,
         },
     }
 

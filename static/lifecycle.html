@@ -270,15 +270,15 @@
     <div class="sc-value" id="sc-expiring">0</div>
     <div class="sc-sub">rental contracts</div>
   </div>
-  <div class="summary-card sc-purple">
-    <div class="sc-label">Revenue at Risk / mo</div>
-    <div class="sc-value" id="sc-revenue-risk">R0</div>
-    <div class="sc-sub">from post-expiry devices</div>
-  </div>
   <div class="summary-card sc-green">
-    <div class="sc-label">Total Monthly Revenue</div>
+    <div class="sc-label">Pure Revenue / mo</div>
+    <div class="sc-value" id="sc-pure-rev">R0</div>
+    <div class="sc-sub">from post-expiry owned assets</div>
+  </div>
+  <div class="summary-card sc-purple">
+    <div class="sc-label">Total GO Net / mo</div>
     <div class="sc-value" id="sc-total-rev">R0</div>
-    <div class="sc-sub">effective current rates</div>
+    <div class="sc-sub">billing minus finance costs</div>
   </div>
 </div>
 
@@ -321,7 +321,7 @@
           <th>Location</th>
           <th class="sortable" data-sort="age_months">Contract <span class="sort-arrow"></span></th>
           <th class="sortable" data-sort="monthly_total_rev">Monthly Rev <span class="sort-arrow"></span></th>
-          <th class="sortable" data-sort="revenue_delta">Rev Δ <span class="sort-arrow"></span></th>
+          <th class="sortable" data-sort="go_net">GO Net / mo <span class="sort-arrow"></span></th>
           <th>Projections</th>
           <th>Action</th>
           <th></th>
@@ -348,6 +348,12 @@
         <input type="number" class="input" id="em-rental-amount" min="0" step="0.01" placeholder="0.00">
       </div>
       <div class="modal-field">
+        <label>Finance Cost (R/month)</label>
+        <input type="number" class="input" id="em-finance-cost" min="0" step="0.01" placeholder="0.00" title="Monthly bank/finance repayment on this asset">
+      </div>
+    </div>
+    <div class="modal-row">
+      <div class="modal-field" style="grid-column:1/-1">
         <label>Rental Period</label>
         <select class="input" id="em-rental-period">
           <option value="">No rental</option>
@@ -498,17 +504,17 @@ async function loadLifecycle(clientId) {
 
 // ── Summary cards ─────────────────────────────────────────────────────────────
 function renderSummary() {
-  const highRisk  = allDevices.filter(d => d.risk_band === 'high').length;
-  const expiring  = allDevices.filter(d => d.months_to_expiry != null && d.months_to_expiry <= 6).length;
-  const revAtRisk = allDevices
-    .filter(d => d.is_expired)
-    .reduce((s, d) => s + Math.abs(d.revenue_delta || 0), 0);
-  const totalRev  = allDevices.reduce((s, d) => s + (d.monthly_total_rev || 0), 0);
+  const highRisk = allDevices.filter(d => d.risk_band === 'high').length;
+  const expiring = allDevices.filter(d => d.months_to_expiry != null && d.months_to_expiry <= 6).length;
+  const pureRev  = allDevices
+    .filter(d => d.is_pure_revenue)
+    .reduce((s, d) => s + (d.go_net || 0), 0);
+  const totalNet = allDevices.reduce((s, d) => s + (d.go_net || 0), 0);
 
-  document.getElementById('sc-high').textContent         = highRisk;
-  document.getElementById('sc-expiring').textContent     = expiring;
-  document.getElementById('sc-revenue-risk').textContent = fmtMoney(revAtRisk);
-  document.getElementById('sc-total-rev').textContent    = fmtMoney(totalRev);
+  document.getElementById('sc-high').textContent     = highRisk;
+  document.getElementById('sc-expiring').textContent = expiring;
+  document.getElementById('sc-pure-rev').textContent = fmtMoney(pureRev);
+  document.getElementById('sc-total-rev').textContent = fmtMoney(totalNet);
   document.getElementById('device-count-label').textContent =
     `${allDevices.length} device${allDevices.length !== 1 ? 's' : ''}`;
 }
@@ -609,7 +615,7 @@ function makeRow(d) {
         Rental: ${fmtMoney(d.effective_rental)}
       </div>
     </td>
-    <td>${deltaCell(d)}</td>
+    <td>${goNetCell(d)}</td>
     <td>${projectionsCell(d)}</td>
     <td>${actionCell(d)}</td>
     <td><button class="btn btn-ghost btn-sm edit-btn">✏️ Edit</button></td>
@@ -648,36 +654,54 @@ function contractCell(d) {
   return statusHtml + detailHtml + ageHtml;
 }
 
-function deltaCell(d) {
-  if (!d.is_expired) {
-    if (d.months_to_expiry != null && d.months_to_expiry <= 6) {
-      const projectedLoss = (d.rental_amount || 0) * 0.75 - (d.monthly_click_rev || 0) * 0.15;
-      return `<div class="delta-na">Projected loss on expiry:</div>
-              <div class="delta-neg">−${fmtMoney(Math.abs(projectedLoss))}</div>`;
-    }
-    return `<span class="delta-na">—</span>`;
+function goNetCell(d) {
+  const net = d.go_net ?? null;
+
+  if (d.is_pure_revenue) {
+    // Asset owned outright — all billing is pure margin
+    return `
+      <div style="color:var(--accent-h); font-weight:600; font-size:14px;">${fmtMoney(net)}</div>
+      <div style="margin-top:3px;">
+        <span style="font-size:10px; background:var(--badge-bg); color:var(--accent-h); padding:2px 7px; border-radius:10px; font-weight:600;">Pure revenue</span>
+      </div>
+      <div style="font-size:10px; color:var(--muted); margin-top:3px;">Asset owned · no finance</div>`;
   }
-  const loss = d.revenue_delta || 0;
-  const cls  = loss < 0 ? 'delta-neg' : 'delta-pos';
-  return `<div class="${cls}">${loss < 0 ? '−' : '+'}${fmtMoney(Math.abs(loss))}/mo</div>
-          <div style="font-size:10px; color:var(--muted); margin-top:2px;">vs pre-expiry</div>`;
+
+  if (net === null || (d.finance_cost == null && net === d.monthly_total_rev)) {
+    // No finance cost entered — show billing with a prompt
+    return `
+      <div style="font-weight:600; font-size:14px;">${fmtMoney(d.monthly_total_rev)}</div>
+      <div style="font-size:10px; color:var(--muted2); margin-top:3px;">Add finance cost to see net</div>`;
+  }
+
+  // In-contract with finance cost known
+  const financeLabel = d.finance_cost > 0
+    ? `<div style="font-size:10px; color:var(--muted); margin-top:2px;">Finance: −${fmtMoney(d.finance_cost)}/mo</div>`
+    : '';
+  return `
+    <div style="font-weight:600; font-size:14px;">${fmtMoney(net)}</div>
+    ${financeLabel}
+    <div style="font-size:10px; color:var(--muted2); margin-top:1px;">of ${fmtMoney(d.monthly_total_rev)} billing</div>`;
 }
 
 function projectionsCell(d) {
   if (!d.projections || !d.projections.length) {
     return '<span style="font-size:11px; color:var(--muted2);">—</span>';
   }
-  const base    = d.monthly_total_rev || 0;
-  const rows    = d.projections.map((p, i) => {
-    const diff  = p - base;
-    const cls   = diff > 0 ? 'proj-up' : diff < 0 ? 'proj-down' : 'proj-flat';
+  const base = d.go_net ?? d.monthly_total_rev ?? 0;
+  const rows = d.projections.map((p, i) => {
+    const val   = p.go_net ?? p;   // support both old number format and new object format
+    const pure  = p.is_pure;
+    const diff  = val - base;
+    const cls   = pure ? 'proj-up' : diff > 0 ? 'proj-up' : diff < 0 ? 'proj-down' : 'proj-flat';
     const arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : '→';
+    const pureTag = pure ? ' <span style="font-size:9px;color:var(--accent-h);">★</span>' : '';
     return `<div class="proj-item">
       <span class="proj-label">+${i + 1}yr</span>
-      <span class="proj-val ${cls}">${arrow} ${fmtMoney(p)}</span>
+      <span class="proj-val ${cls}">${arrow} ${fmtMoney(val)}${pureTag}</span>
     </div>`;
   }).join('');
-  return `<div class="proj-row">${rows}</div>`;
+  return `<div class="proj-row">${rows}<div style="font-size:9px;color:var(--muted2);margin-top:3px;">★ pure revenue</div></div>`;
 }
 
 function actionCell(d) {
@@ -734,6 +758,7 @@ function openEditModal(d) {
   document.getElementById('edit-modal-title').textContent = `✏️ ${d.label || 'Device'}`;
   document.getElementById('em-contract-start').value = d.contract_start_date || '';
   document.getElementById('em-rental-amount').value  = d.rental_amount  || '';
+  document.getElementById('em-finance-cost').value   = d.finance_cost   || '';
   document.getElementById('em-rental-period').value  = d.rental_period  || '';
   document.getElementById('em-avg-mono').value        = d.avg_mono       || '';
   document.getElementById('em-avg-colour').value      = d.avg_colour     || '';
@@ -777,6 +802,7 @@ document.getElementById('em-save').addEventListener('click', async () => {
       mono_rate:           parseFloat(document.getElementById('em-mono-rate').value)      || null,
       colour_rate:         parseFloat(document.getElementById('em-colour-rate').value)    || null,
       rental_amount:       parseFloat(document.getElementById('em-rental-amount').value)  || null,
+      finance_cost:        parseFloat(document.getElementById('em-finance-cost').value)   || null,
       rental_period:       document.getElementById('em-rental-period').value              || null,
       contract_start_date: document.getElementById('em-contract-start').value             || null,
     });

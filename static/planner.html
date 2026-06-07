@@ -259,6 +259,27 @@
     select.input { appearance: none; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px; }
     select.input option { background: #1c1f2b; color: #e0e0e0; }
 
+    /* ── Select mode ── */
+    #select-mode-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    #canvas-area.select-mode { cursor: crosshair; }
+    #canvas-area.select-mode .device-node { cursor: pointer; }
+    .device-node.selected .d-icon {
+      border-color: #f97316;
+      box-shadow: 0 0 0 2px #f97316, 0 0 10px rgba(249,115,22,0.45);
+    }
+    #bulk-bar {
+      display: none; align-items: center; gap: 10px;
+      padding: 6px 16px; background: var(--surface2);
+      border-bottom: 2px solid #f97316; flex-shrink: 0;
+      font-size: 12px;
+    }
+    #bulk-bar.visible { display: flex; }
+    #bulk-count { font-weight: 600; color: var(--text); min-width: 90px; }
+    #bulk-edit-modal .modal { width: 440px; max-height: 90vh; overflow-y: auto; }
+    .be-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 14px; }
+    .be-chk  { flex-shrink: 0; width: 16px; margin-top: 24px; accent-color: var(--accent); cursor: pointer; }
+    .be-body { flex: 1; }
+
     /* ── Edit modal ── */
     #edit-modal .modal { width: 380px; max-height: 90vh; overflow-y: auto; }
 
@@ -279,6 +300,7 @@
   <h1>PrintMap</h1>
   <span id="floor-label">Loading…</span>
   <button class="btn btn-ghost btn-sm" id="hand-tool-btn" style="margin-left:auto" title="Hand tool — pan the map (or hold Space)">✋</button>
+  <button class="btn btn-ghost btn-sm" id="select-mode-btn" title="Select mode — click devices to select for bulk delete or edit">☑ Select</button>
   <div id="zoom-bar" title="Zoom  (+/= zoom in · − zoom out · 0 reset)">
     🔍
     <button class="btn btn-ghost btn-sm" id="zoom-out-btn" title="Zoom out">−</button>
@@ -298,6 +320,15 @@
   <span style="font-size:11px; color:var(--muted2); white-space:nowrap; margin-right:4px;">Scenarios:</span>
   <div id="scenario-tabs"></div>
   <button id="add-scenario-btn">+ Replacement</button>
+</div>
+
+<div id="bulk-bar">
+  <span id="bulk-count">0 selected</span>
+  <button class="btn btn-ghost btn-sm" onclick="selectAll()">Select All</button>
+  <button class="btn btn-ghost btn-sm" onclick="clearSelection()">Deselect All</button>
+  <div style="flex:1"></div>
+  <button class="btn btn-neutral btn-sm" onclick="openBulkEditModal()">✏ Edit Selected</button>
+  <button class="btn btn-sm" style="background:var(--danger);color:var(--danger-t);border:1px solid rgba(239,68,68,0.4);" onclick="bulkDelete()">✕ Delete Selected</button>
 </div>
 
 <div class="workspace">
@@ -465,6 +496,96 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="bulk-edit-modal">
+  <div class="modal">
+    <h2>✏ Edit Selected Devices</h2>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">Tick the fields you want to update — unchecked fields are left unchanged on all selected devices.</p>
+
+    <div class="be-row">
+      <input type="checkbox" id="be-type-chk" class="be-chk">
+      <div class="be-body">
+        <label>Device Type</label>
+        <select id="be-type" class="input" onchange="document.getElementById('be-type-chk').checked=true">
+          <option value="printer">Printer</option>
+          <option value="mfp">MFP / Copier</option>
+          <option value="scanner">Scanner / Fax</option>
+          <option value="server">Print Server</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="be-row">
+      <input type="checkbox" id="be-brand-chk" class="be-chk">
+      <div class="be-body">
+        <div style="display:flex;gap:10px;">
+          <div style="flex:1">
+            <label>Brand</label>
+            <select id="be-brand" class="input">
+              <option value="">— Select brand —</option>
+            </select>
+          </div>
+          <div style="flex:1">
+            <label>Model</label>
+            <select id="be-model" class="input">
+              <option value="">— Select brand first —</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="be-row">
+      <input type="checkbox" id="be-rates-chk" class="be-chk">
+      <div class="be-body" style="display:flex;gap:10px;">
+        <div style="flex:1">
+          <label>Mono Rate (R/page)</label>
+          <input id="be-mono-rate" class="input" type="number" min="0" step="0.0001" placeholder="0.0000" oninput="document.getElementById('be-rates-chk').checked=true">
+        </div>
+        <div style="flex:1">
+          <label>Colour Rate (R/page)</label>
+          <input id="be-colour-rate" class="input" type="number" min="0" step="0.0001" placeholder="0.0000" oninput="document.getElementById('be-rates-chk').checked=true">
+        </div>
+      </div>
+    </div>
+
+    <div class="be-row">
+      <input type="checkbox" id="be-rental-chk" class="be-chk">
+      <div class="be-body" style="display:flex;gap:10px;">
+        <div style="flex:1">
+          <label>Rental Amount (R/mo)</label>
+          <input id="be-rental-amount" class="input" type="number" min="0" step="0.01" placeholder="0.00" oninput="document.getElementById('be-rental-chk').checked=true">
+        </div>
+        <div style="flex:1">
+          <label>Rental Period</label>
+          <select id="be-rental-period" class="input" onchange="document.getElementById('be-rental-chk').checked=true">
+            <option value="">No rental</option>
+            <option value="12">12 months</option>
+            <option value="24">24 months</option>
+            <option value="36">36 months</option>
+            <option value="72">72 months</option>
+            <option value="Evergreen">Evergreen</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="be-row">
+      <input type="checkbox" id="be-vendor-chk" class="be-chk">
+      <div class="be-body">
+        <label>Service Agent</label>
+        <select id="be-vendor" class="input" onchange="document.getElementById('be-vendor-chk').checked=true">
+          <option value="">— None —</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-neutral" onclick="document.getElementById('bulk-edit-modal').classList.remove('open')">Cancel</button>
+      <button class="btn btn-primary" onclick="applyBulkEdit()">Apply to Selected</button>
+    </div>
+  </div>
+</div>
+
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -494,6 +615,8 @@ let buildingLat  = null;
 let buildingLng  = null;
 let draggingNode = null;
 let panMode      = false;
+let selectMode   = false;
+let selectedIds  = new Set();
 let panning      = null;
 let spaceHeld    = false;
 let ctxTarget    = null;
@@ -836,6 +959,7 @@ function onNodeMouseDown(e, el, data) {
   if (e.button !== 0 || panMode) return; // in pan mode let event bubble to canvas-area
   e.stopPropagation();
   e.preventDefault();
+  if (selectMode) { toggleNodeSelect(el, data); return; }
   const rect = floorCanvas.getBoundingClientRect();
   draggingNode = { el, data, ox: (e.clientX - rect.left) / viewZoom - data.x, oy: (e.clientY - rect.top) / viewZoom - data.y };
   el.style.zIndex = 50;
@@ -899,6 +1023,7 @@ document.addEventListener('mouseup', () => {
 // Spacebar = temporary pan; +/=/- /0 = zoom
 document.addEventListener('keydown', e => {
   if (e.target.matches('input,textarea,select')) return;
+  if (e.key === 'Escape' && selectMode) { setSelectMode(false); return; }
   if (e.key === ' ' && !spaceHeld) {
     e.preventDefault();
     spaceHeld = true;
@@ -1286,6 +1411,147 @@ document.getElementById('export-list-btn').addEventListener('click', () => {
 });
 
 // ── Replacement Scenarios ─────────────────────────────────────────────────────
+
+// ── Bulk select ───────────────────────────────────────────────────────────────
+
+function setSelectMode(on) {
+  selectMode = on;
+  document.getElementById('select-mode-btn').classList.toggle('active', on);
+  canvasArea.classList.toggle('select-mode', on);
+  if (!on) {
+    clearSelection();
+  } else {
+    if (panMode) setPanMode(false); // exit pan mode when entering select
+    updateBulkBar();
+  }
+}
+
+document.getElementById('select-mode-btn').addEventListener('click', () => setSelectMode(!selectMode));
+
+function toggleNodeSelect(el, data) {
+  if (selectedIds.has(data.id)) {
+    selectedIds.delete(data.id);
+    el.classList.remove('selected');
+  } else {
+    selectedIds.add(data.id);
+    el.classList.add('selected');
+  }
+  updateBulkBar();
+}
+
+function selectAll() {
+  planContainer.querySelectorAll('.device-node').forEach(el => {
+    const d = el._data;
+    if (d) { selectedIds.add(d.id); el.classList.add('selected'); }
+  });
+  updateBulkBar();
+}
+
+function clearSelection() {
+  selectedIds.clear();
+  planContainer.querySelectorAll('.device-node.selected').forEach(el => el.classList.remove('selected'));
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const n = selectedIds.size;
+  document.getElementById('bulk-count').textContent = `${n} device${n !== 1 ? 's' : ''} selected`;
+  document.getElementById('bulk-bar').classList.toggle('visible', selectMode);
+}
+
+function bulkDelete() {
+  const n = selectedIds.size;
+  if (!n) { alert('No devices selected.'); return; }
+  if (!confirm(`Delete ${n} selected device${n !== 1 ? 's' : ''}? This cannot be undone.`)) return;
+  const toDelete = new Set(selectedIds);
+  planContainer.querySelectorAll('.device-node').forEach(el => {
+    if (!el._data || !toDelete.has(el._data.id)) return;
+    const d = el._data;
+    devices = devices.filter(x => x.id !== d.id);
+    el.remove();
+    if (!d.id.startsWith('temp-')) apiJson('DELETE', `/devices/${d.id}`);
+  });
+  selectedIds.clear();
+  updateStats();
+  updateBulkBar();
+}
+
+function openBulkEditModal() {
+  if (!selectedIds.size) { alert('No devices selected.'); return; }
+  const brandSel = document.getElementById('be-brand');
+  brandSel.innerHTML = '<option value="">— Select brand —</option>';
+  catalogue.forEach(b => {
+    const o = document.createElement('option');
+    o.value = b.name; o.textContent = b.name;
+    brandSel.appendChild(o);
+  });
+  document.getElementById('be-model').innerHTML = '<option value="">— Select brand first —</option>';
+  const vendorSel = document.getElementById('be-vendor');
+  vendorSel.innerHTML = '<option value="">— None —</option>';
+  vendors.forEach(v => {
+    const o = document.createElement('option');
+    o.value = v.id; o.textContent = v.name;
+    vendorSel.appendChild(o);
+  });
+  ['be-type-chk','be-brand-chk','be-rates-chk','be-rental-chk','be-vendor-chk'].forEach(id => {
+    document.getElementById(id).checked = false;
+  });
+  ['be-mono-rate','be-colour-rate','be-rental-amount'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('bulk-edit-modal').classList.add('open');
+}
+
+document.getElementById('be-brand').addEventListener('change', function() {
+  const brand = catalogue.find(b => b.name === this.value);
+  const modelSel = document.getElementById('be-model');
+  modelSel.innerHTML = '<option value="">— Select model —</option>';
+  (brand?.models || []).forEach(m => {
+    const o = document.createElement('option');
+    o.value = m.name; o.textContent = m.name;
+    modelSel.appendChild(o);
+  });
+  if (this.value) document.getElementById('be-brand-chk').checked = true;
+});
+
+async function applyBulkEdit() {
+  const updates = {};
+  if (document.getElementById('be-type-chk').checked)   updates.type   = document.getElementById('be-type').value;
+  if (document.getElementById('be-brand-chk').checked) {
+    updates.brand = document.getElementById('be-brand').value;
+    updates.model = document.getElementById('be-model').value;
+  }
+  if (document.getElementById('be-rates-chk').checked) {
+    updates.mono_rate   = parseFloat(document.getElementById('be-mono-rate').value)   || null;
+    updates.colour_rate = parseFloat(document.getElementById('be-colour-rate').value) || null;
+  }
+  if (document.getElementById('be-rental-chk').checked) {
+    updates.rental_amount = parseFloat(document.getElementById('be-rental-amount').value) || null;
+    updates.rental_period = document.getElementById('be-rental-period').value || null;
+  }
+  if (document.getElementById('be-vendor-chk').checked) {
+    updates.vendor_id = document.getElementById('be-vendor').value || null;
+  }
+  if (!Object.keys(updates).length) { alert('Tick at least one field to update.'); return; }
+
+  document.getElementById('bulk-edit-modal').classList.remove('open');
+
+  const promises = [];
+  planContainer.querySelectorAll('.device-node').forEach(el => {
+    const d = el._data;
+    if (!d || !selectedIds.has(d.id)) return;
+    Object.assign(d, updates);
+    if (updates.type) {
+      d.icon = DEVICE_ICONS[updates.type] || d.icon;
+      el.querySelector('.d-icon').textContent = d.icon;
+    }
+    refreshVolLabel(el, d);
+    if (!d.id.startsWith('temp-')) promises.push(syncDevice(d));
+  });
+  setSyncStatus('saving');
+  await Promise.all(promises);
+  setSyncStatus('saved');
+}
 
 async function loadScenarios() {
   try {

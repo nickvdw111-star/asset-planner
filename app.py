@@ -449,6 +449,16 @@ def floor_label(level):
     return str(level)
 
 
+# ── Version ───────────────────────────────────────────────────────────────────
+
+@app.route('/api/version')
+def get_version():
+    try:
+        ver = open(os.path.join(os.path.dirname(__file__), 'VERSION')).read().strip()
+    except Exception:
+        ver = 'unknown'
+    return jsonify({'version': ver, 'built': date.today().isoformat()})
+
 # ── Static pages ──────────────────────────────────────────────────────────────
 
 @app.route('/')

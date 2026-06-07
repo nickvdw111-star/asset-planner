@@ -522,6 +522,22 @@
         </div>
       </div>
 
+      <!-- Service Agent -->
+      <div class="dm-section" id="dms-service">
+        <div class="dm-section-head" onclick="toggleDmSection('dms-service')">
+          <span>Service Agent</span><span class="dm-arrow">▾</span>
+        </div>
+        <div class="dm-section-body">
+          <div class="modal-field">
+            <label>Assigned Agent</label>
+            <select class="input" id="dm-vendor">
+              <option value="">— None —</option>
+            </select>
+            <div id="dm-vendor-distance" style="margin-top:5px; font-size:11px; color:var(--accent-h); display:none;"></div>
+          </div>
+        </div>
+      </div>
+
       <!-- Notes -->
       <div class="dm-section" id="dms-notes">
         <div class="dm-section-head" onclick="toggleDmSection('dms-notes')">
@@ -941,13 +957,21 @@ function renderMap() {
       `, { permanent: true, direction: 'top', className: 'map-label', offset: [0, -6] });
 
       const floorList = building.floors.length
-        ? building.floors.map(f => `<span style="color:var(--muted)">📐 ${f.label} (${f.device_count} device${f.device_count !== 1 ? 's' : ''})</span>`).join('<br>')
+        ? building.floors.map(f =>
+            `<a href="/planner?floor=${f.id}&client=${activeClient.id}"
+                style="display:block; color:var(--accent-h); text-decoration:none; padding:2px 0;"
+                onmouseover="this.style.textDecoration='underline'"
+                onmouseout="this.style.textDecoration='none'">
+              📐 ${f.label}
+              <span style="color:var(--muted); font-size:11px;">(${f.device_count} device${f.device_count !== 1 ? 's' : ''})</span>
+            </a>`
+          ).join('')
         : '<span style="color:var(--muted2); font-style:italic">No floors yet</span>';
 
       marker.bindPopup(`
         <strong>🏗 ${building.name}</strong>
         <div class="pop-meta">🌆 ${city.name}</div>
-        <div style="margin-top:8px; font-size:12px;">${floorList}</div>
+        <div style="margin-top:8px; font-size:12px; line-height:1.8;">${floorList}</div>
       `);
 
       markersLayer.addLayer(marker);
@@ -1404,6 +1428,38 @@ function populateDmFloor(buildingId, selectedFloorId) {
   });
 }
 
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371, toR = Math.PI / 180;
+  const dLat = (lat2 - lat1) * toR, dLng = (lng2 - lng1) * toR;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*toR) * Math.cos(lat2*toR) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function populateDmVendor(selectedId, buildingLat, buildingLng) {
+  const sel = document.getElementById('dm-vendor');
+  sel.innerHTML = '<option value="">— None —</option>';
+  allVendors.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v.id;
+    opt.textContent = `${v.name} (${v.type === 'GO' ? 'GO Branch' : 'B2B'} · ${v.city})`;
+    if (v.id === selectedId) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  updateDmVendorDistance(buildingLat, buildingLng);
+}
+
+function updateDmVendorDistance(buildingLat, buildingLng) {
+  const distEl = document.getElementById('dm-vendor-distance');
+  const vid = parseInt(document.getElementById('dm-vendor').value);
+  const v = allVendors.find(x => x.id === vid);
+  if (v && v.lat != null && v.lng != null && buildingLat != null && buildingLng != null) {
+    distEl.textContent = `📍 ${Math.round(haversineKm(buildingLat, buildingLng, v.lat, v.lng))} km from this building`;
+    distEl.style.display = '';
+  } else {
+    distEl.style.display = 'none';
+  }
+}
+
 function openDeviceModal(device, floorId, container) {
   const loc = findDeviceLocation(floorId);
   dmTarget = { device, floorId, container, originalFloorId: floorId };
@@ -1433,6 +1489,11 @@ function openDeviceModal(device, floorId, container) {
   document.getElementById('dm-new-model').value = '';
   populateDmBrand(device.brand || '');
   populateDmModel(device.brand || '', device.model || '');
+
+  const bLat = loc?.building?.lat ?? null;
+  const bLng = loc?.building?.lng ?? null;
+  populateDmVendor(device.vendor_id || null, bLat, bLng);
+  document.getElementById('dm-vendor').onchange = () => updateDmVendorDistance(bLat, bLng);
 
   if (loc) {
     populateDmCity(loc.city.id);
@@ -1474,6 +1535,7 @@ document.getElementById('dm-save').addEventListener('click', async () => {
     rental_period:       document.getElementById('dm-rental-period').value || null,
     contract_start_date: getDateValue(document.getElementById('dm-contract-start')),
     notes:          document.getElementById('dm-notes').value.trim(),
+    vendor_id:      parseInt(document.getElementById('dm-vendor').value) || null,
     x_pct:          floorChanged ? 0 : device.x_pct,
     y_pct:          floorChanged ? 0 : device.y_pct,
   };

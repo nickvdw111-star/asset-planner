@@ -277,6 +277,7 @@
   <div class="ttab" id="tab-import"    onclick="switchTab('import')">Fleet Import</div>
   <div class="ttab" id="tab-rates"     onclick="switchTab('rates')">Rates</div>
   <div class="ttab" id="tab-vendors"   onclick="switchTab('vendors')">Service Agents</div>
+  <div class="ttab" id="tab-about"     onclick="switchTab('about')">About</div>
 </div>
 
 <!-- ── Catalogue pane ── -->
@@ -638,6 +639,38 @@
   </div>
 </div>
 
+<!-- ── About pane ── -->
+<div id="about-pane" class="tab-pane" style="flex-direction:column; align-items:center; justify-content:center; gap:0;">
+  <div style="max-width:480px; width:100%; padding:40px 24px; text-align:center;">
+    <div style="font-size:52px; margin-bottom:16px;">🖨</div>
+    <h2 style="font-size:22px; font-weight:700; margin-bottom:6px;">PrintMap</h2>
+    <div style="font-size:13px; color:var(--muted); margin-bottom:32px;">Printer fleet planning &amp; service coverage</div>
+
+    <div style="background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:24px; text-align:left; margin-bottom:24px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid var(--border);">
+        <span style="font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.07em;">Version</span>
+        <span id="about-version" style="font-size:20px; font-weight:700; color:var(--accent-h); font-family:monospace;">—</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+        <span style="font-size:12px; color:var(--muted);">Release stage</span>
+        <span id="about-stage" style="font-size:12px;">—</span>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span style="font-size:12px; color:var(--muted);">Server date</span>
+        <span id="about-date" style="font-size:12px; font-family:monospace;">—</span>
+      </div>
+    </div>
+
+    <div style="background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:20px; text-align:left; font-size:12px; color:var(--muted); line-height:2;">
+      <div><b style="color:var(--muted2);">Versioning convention (SemVer)</b></div>
+      <div>0.x.x &nbsp;→&nbsp; Pre-release / active development</div>
+      <div>MINOR bump (0.1 → 0.2) &nbsp;→&nbsp; New features pushed to GitHub</div>
+      <div>PATCH bump (0.2.0 → 0.2.1) &nbsp;→&nbsp; Bug fixes only</div>
+      <div>1.0.0 &nbsp;→&nbsp; First stable production release</div>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -650,11 +683,12 @@ let activeTab = 'catalogue';
 
 function switchTab(tab) {
   activeTab = tab;
-  ['catalogue', 'compare', 'import', 'rates', 'vendors'].forEach(t => {
+  ['catalogue', 'compare', 'import', 'rates', 'vendors', 'about'].forEach(t => {
     document.getElementById('tab-' + t).classList.toggle('active', tab === t);
     document.getElementById(t + '-pane').classList.toggle('active', tab === t);
   });
   if (tab === 'vendors') loadVendors();
+  if (tab === 'about')   loadAbout();
 }
 
 async function api(method, path, body) {
@@ -1500,7 +1534,7 @@ async function loadVendors() {
   try {
     vendors = await api('GET', '/vendors');
     renderVendorTable();
-  } catch (e) { showToast('Could not load vendors: ' + e.message, true); }
+  } catch (e) { toast('Could not load vendors: ' + e.message, true); }
 }
 
 function renderVendorTable() {
@@ -1575,8 +1609,8 @@ async function saveVendor() {
     }
     closeVendorModal();
     await loadVendors();
-    showToast('Saved.');
-  } catch (e) { showToast('Error: ' + e.message, true); }
+    toast('Saved.');
+  } catch (e) { toast('Error: ' + e.message, true); }
 }
 
 async function deleteVendor() {
@@ -1585,13 +1619,26 @@ async function deleteVendor() {
     await api('DELETE', `/vendors/${editingVendorId}`);
     closeVendorModal();
     await loadVendors();
-    showToast('Deleted.');
-  } catch (e) { showToast('Error: ' + e.message, true); }
+    toast('Deleted.');
+  } catch (e) { toast('Error: ' + e.message, true); }
 }
 
 document.getElementById('vendor-modal').addEventListener('click', e => {
   if (e.target === document.getElementById('vendor-modal')) closeVendorModal();
 });
+
+// ── About ─────────────────────────────────────────────────────────────────────
+
+async function loadAbout() {
+  try {
+    const { version, built } = await api('GET', '/version');
+    const [major] = version.split('.').map(Number);
+    const stage = major === 0 ? 'Pre-release (development)' : `Stable release v${version}`;
+    document.getElementById('about-version').textContent = 'v' + version;
+    document.getElementById('about-stage').textContent   = stage;
+    document.getElementById('about-date').textContent    = built;
+  } catch { /* non-fatal */ }
+}
 </script>
 </body>
 </html>

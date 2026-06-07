@@ -556,6 +556,23 @@ document.getElementById('client-select').addEventListener('change', e => {
   document.getElementById('admin-link').href    = `/admin?client=${id}`;
 });
 
+document.getElementById('planner-link').addEventListener('click', async function(e) {
+  const clientId = new URL(this.href, location.origin).searchParams.get('client');
+  if (!clientId) return;
+  e.preventDefault();
+  try {
+    const tree = await fetch('/api/tree').then(r => r.json());
+    const client = tree.find(c => c.id == clientId);
+    const floors = [];
+    (client?.cities || []).forEach(ci => (ci.buildings || []).forEach(b =>
+      (b.floors || []).forEach(f => { if (!f.source_floor_id) floors.push(f); })
+    ));
+    if (!floors.length) { alert('No floor plans found for this client.'); return; }
+    if (floors.length === 1) window.location.href = `/planner?floor=${floors[0].id}&client=${clientId}`;
+    else window.location.href = `/?client=${clientId}`;
+  } catch { window.location.href = this.href; }
+});
+
 function clearView() {
   allDevices = [];
   activeClientId = null;

@@ -428,7 +428,7 @@ function openFloorPicker() {
 
   const allFloors = [];
   client.cities.forEach(c => c.buildings.forEach(b => b.floors.forEach(f => {
-    allFloors.push({ ...f, building_name: b.name, city_name: c.name });
+    if (!f.source_floor_id) allFloors.push({ ...f, building_name: b.name, city_name: c.name });
   })));
 
   if (!allFloors.length) { toast('Add a building and floor plan first.'); return; }

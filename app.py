@@ -1835,7 +1835,7 @@ def capture_fleet(cid):
             JOIN floors    f  ON f.id  = d.floor_id
             JOIN buildings b  ON b.id  = f.building_id
             JOIN cities    ci ON ci.id = b.city_id
-            WHERE ci.client_id = ?
+            WHERE ci.client_id = ? AND f.source_floor_id IS NULL
             ORDER BY ci.name, b.name, f.level, d.label
         ''', (cid,)).fetchall()
         sc_id = _get_or_create_scenario(db, cid, 'current')

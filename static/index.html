@@ -89,6 +89,7 @@
     #client-view { display: none; }
     #client-view.active { display: block; }
     #hub-view.hidden { display: none; }
+    #hub-view.hidden + * #hub-hero, #client-view.active ~ #hub-hero { display: none; }
 
     .cv-header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
     .cv-header h2 { font-size: 20px; font-weight: 700; }
@@ -161,7 +162,6 @@
 <body>
 
 <header>
-  <img src="/printmap-logo.png" alt="PrintMap" style="height:36px; width:auto;">
   <span class="tagline">MPS Fleet Planning &amp; Optimisation</span>
   <div style="margin-left:auto">
     <a href="/admin" class="btn btn-neutral btn-sm" style="text-decoration:none">⚙️ Admin</a>
@@ -170,6 +170,9 @@
 
 <!-- ── Hub view ── -->
 <div class="main" id="hub-view">
+  <div style="text-align:center; padding: 40px 0 36px;">
+    <img src="/printmap-logo.png" alt="PrintMap" style="height:110px; width:auto; filter:drop-shadow(0 4px 24px rgba(96,165,250,0.25));">
+  </div>
   <div class="stats-strip">
     <div class="stat-card"><span class="stat-val" id="stat-clients">—</span><span class="stat-lbl">Clients</span></div>
     <div class="stat-card"><span class="stat-val" id="stat-buildings">—</span><span class="stat-lbl">Buildings</span></div>

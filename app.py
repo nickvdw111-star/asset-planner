@@ -459,6 +459,73 @@ def get_version():
         ver = 'unknown'
     return jsonify({'version': ver, 'built': date.today().isoformat()})
 
+@app.route('/api/dashboard')
+def dashboard_data():
+    with get_db() as db:
+        clients = db.execute('''
+            SELECT c.id, c.name,
+                   COUNT(DISTINCT ci.id)  AS city_count,
+                   COUNT(DISTINCT b.id)   AS building_count,
+                   COUNT(DISTINCT d.id)   AS device_count,
+                   GROUP_CONCAT(DISTINCT ci.name) AS city_names
+            FROM clients c
+            LEFT JOIN cities    ci ON ci.client_id = c.id
+            LEFT JOIN buildings b  ON b.city_id    = ci.id
+            LEFT JOIN floors    f  ON f.building_id = b.id
+            LEFT JOIN devices   d  ON d.floor_id   = f.id
+            GROUP BY c.id, c.name
+            ORDER BY c.name
+        ''').fetchall()
+        totals = db.execute('''
+            SELECT COUNT(DISTINCT c.id) AS total_clients,
+                   COUNT(DISTINCT b.id) AS total_buildings,
+                   COUNT(DISTINCT d.id) AS total_devices
+            FROM clients c
+            LEFT JOIN cities    ci ON ci.client_id  = c.id
+            LEFT JOIN buildings b  ON b.city_id     = ci.id
+            LEFT JOIN floors    f  ON f.building_id = b.id
+            LEFT JOIN devices   d  ON d.floor_id    = f.id
+        ''').fetchone()
+        # Floor tree for planner navigation (client → cities → buildings → floors)
+        floors = db.execute('''
+            SELECT f.id AS floor_id, f.label AS floor_label,
+                   b.id AS building_id, b.name AS building_name,
+                   ci.id AS city_id, ci.name AS city_name,
+                   ci.client_id
+            FROM floors f
+            JOIN buildings b ON b.id = f.building_id
+            JOIN cities ci   ON ci.id = b.city_id
+            ORDER BY ci.client_id, ci.name, b.name, f.level
+        ''').fetchall()
+    floor_tree = {}
+    for r in floors:
+        cid = r['client_id']
+        if cid not in floor_tree:
+            floor_tree[cid] = {}
+        ckey = (r['city_id'], r['city_name'])
+        if ckey not in floor_tree[cid]:
+            floor_tree[cid][ckey] = {}
+        bkey = (r['building_id'], r['building_name'])
+        if bkey not in floor_tree[cid][ckey]:
+            floor_tree[cid][ckey][bkey] = []
+        floor_tree[cid][ckey][bkey].append({'id': r['floor_id'], 'label': r['floor_label']})
+    # Serialise floor_tree
+    serialised = {}
+    for cid, cities in floor_tree.items():
+        serialised[cid] = [
+            {'city_id': ck[0], 'city_name': ck[1],
+             'buildings': [
+                 {'building_id': bk[0], 'building_name': bk[1], 'floors': flist}
+                 for bk, flist in buildings.items()
+             ]}
+            for ck, buildings in cities.items()
+        ]
+    return jsonify({
+        'totals':     dict(totals),
+        'clients':    [dict(r) for r in clients],
+        'floor_tree': serialised,
+    })
+
 @app.route('/api/changelog')
 def get_changelog():
     try:

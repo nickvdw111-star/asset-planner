@@ -205,13 +205,17 @@
 <body>
 
 <header>
-  <a id="back-btn" href="/" class="btn btn-neutral btn-sm" style="text-decoration:none">← Dashboard</a>
-  <h1>📊 Fleet Report</h1>
-  <span style="font-size:12px; color:var(--muted)">Volume, cost and composition analysis</span>
-  <div style="margin-left:auto; display:flex; gap:8px;">
+  <a id="home-link" href="/" class="btn btn-neutral btn-sm" style="text-decoration:none">← Home</a>
+  <h1>📊 Reports</h1>
+  <div style="margin-left:auto; display:flex; gap:6px; align-items:center;">
+    <a id="lifecycle-link" href="/lifecycle" class="btn btn-ghost btn-sm" style="text-decoration:none">Lifecycle</a>
+    <a id="planner-link"  href="/planner"   class="btn btn-ghost btn-sm" style="text-decoration:none">Planner</a>
+    <a id="tco-link"      href="/tco"       class="btn btn-ghost btn-sm" style="text-decoration:none">TCO</a>
+    <span class="btn btn-ghost btn-sm" style="font-weight:700; cursor:default;">Reports</span>
+    <a id="admin-link"    href="/admin"     class="btn btn-neutral btn-sm" style="text-decoration:none">Admin</a>
+    <span style="width:1px;height:18px;background:var(--border);display:inline-block;margin:0 2px;"></span>
     <button class="btn btn-ghost btn-sm" id="pdf-btn">📄 Export PDF</button>
     <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨 Print</button>
-    <button class="btn btn-ghost btn-sm theme-btn" onclick="toggleTheme()" title="Switch theme">☀</button>
   </div>
 </header>
 
@@ -264,7 +268,7 @@ document.getElementById('client-sel').addEventListener('change', async e => {
   const id = parseInt(e.target.value);
   if (!id) { clearReport(); sessionStorage.removeItem('reportClientId'); return; }
   sessionStorage.setItem('reportClientId', id);
-  document.getElementById('back-btn').href = `/?client=${id}`;
+  setNavLinks(id);
   await loadReport(id);
 });
 
@@ -272,7 +276,7 @@ function clearReport() {
   document.getElementById('report-body').classList.remove('visible');
   document.getElementById('report-body').innerHTML = '';
   document.getElementById('empty-hint').classList.remove('hidden');
-  document.getElementById('back-btn').href = '/';
+  setNavLinks('');
 }
 
 // ── Report loader ─────────────────────────────────────────────────────────────
@@ -554,7 +558,16 @@ document.getElementById('pdf-btn').addEventListener('click', () => {
 
 const urlParams   = new URLSearchParams(location.search);
 const urlClientId = parseInt(urlParams.get('client')) || parseInt(sessionStorage.getItem('reportClientId'));
-if (urlClientId) document.getElementById('back-btn').href = `/?client=${urlClientId}`;
+function setNavLinks(id) {
+  const s = id ? `?client=${id}` : '';
+  document.getElementById('home-link').href      = id ? `/?client=${id}` : '/';
+  document.getElementById('lifecycle-link').href = `/lifecycle${s}`;
+  document.getElementById('planner-link').href   = `/planner${s}`;
+  document.getElementById('tco-link').href       = `/tco${s}`;
+  document.getElementById('admin-link').href     = `/admin${s}`;
+}
+
+if (urlClientId) setNavLinks(urlClientId);
 
 loadClients().then(() => {
   if (urlClientId) {

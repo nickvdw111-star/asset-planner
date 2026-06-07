@@ -4,6 +4,16 @@ All notable changes to PrintMap are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-06-07
+### Added
+- Landing page redesigned as a client hub home screen: stats strip (clients, buildings, devices), client card grid with search, and a "+ New Client" add card
+- Client detail view on the home screen: four tool cards (Lifecycle, Planner, TCO Calculator, Reports) for direct navigation, plus a Buildings & Floors section for managing the full city → building → floor hierarchy
+- Floor picker modal when opening the Planner from the home screen (auto-navigates if only one floor exists)
+- Floor plan upload and floor management (add, delete) directly from the home screen client view
+- `/api/dashboard` endpoint providing fleet-wide totals and per-client summaries for the stats strip and client cards
+- Navigation bar standardised across all inner pages: Lifecycle → Planner → TCO → Reports | Admin, with current page highlighted; nav links carry the active client parameter
+- "← Dashboard" back buttons renamed to "← Home" across all pages
+
 ## [0.1.1] - 2026-06-07
 ### Fixed
 - Deleting a device from the TCO current scenario now prompts to also remove it from the floor plan, keeping the map and TCO in sync

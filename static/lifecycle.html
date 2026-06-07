@@ -274,14 +274,14 @@
 <body>
 
 <header>
-  <h1>🔬 Lifecycle &amp; Risk</h1>
-  <span style="font-size:12px; color:var(--muted); margin-left:4px;">Device Lifecycle Analysis</span>
-  <div style="margin-left:auto; display:flex; gap:8px;">
-    <a href="/" class="btn btn-neutral" style="text-decoration:none">📋 Dashboard</a>
-    <a id="reports-link" href="/reports" class="btn btn-neutral" style="text-decoration:none">📊 Reports</a>
-    <a id="tco-link" href="/tco" class="btn btn-neutral" style="text-decoration:none">💰 TCO</a>
-    <a id="admin-link" href="/admin" class="btn btn-neutral" style="text-decoration:none">⚙️ Admin</a>
-    <button class="btn btn-ghost btn-sm theme-btn" onclick="toggleTheme()" title="Switch theme">☀</button>
+  <a id="home-link" href="/" class="btn btn-neutral btn-sm" style="text-decoration:none">← Home</a>
+  <h1>🔬 Lifecycle</h1>
+  <div style="margin-left:auto; display:flex; gap:6px; align-items:center;">
+    <span class="btn btn-ghost btn-sm" style="font-weight:700; cursor:default;">Lifecycle</span>
+    <a id="planner-link" href="/planner" class="btn btn-ghost btn-sm" style="text-decoration:none">Planner</a>
+    <a id="tco-link" href="/tco" class="btn btn-ghost btn-sm" style="text-decoration:none">TCO</a>
+    <a id="reports-link" href="/reports" class="btn btn-ghost btn-sm" style="text-decoration:none">Reports</a>
+    <a id="admin-link" href="/admin" class="btn btn-neutral btn-sm" style="text-decoration:none">Admin</a>
   </div>
 </header>
 
@@ -550,9 +550,11 @@ document.getElementById('client-select').addEventListener('change', e => {
   const id = parseInt(e.target.value);
   if (!id) { clearView(); return; }
   loadLifecycle(id);
-  document.getElementById('reports-link').href = `/reports?client=${id}`;
-  document.getElementById('tco-link').href     = `/tco?client=${id}`;
-  document.getElementById('admin-link').href   = `/admin?client=${id}`;
+  document.getElementById('home-link').href     = `/?client=${id}`;
+  document.getElementById('planner-link').href  = `/planner?client=${id}`;
+  document.getElementById('tco-link').href      = `/tco?client=${id}`;
+  document.getElementById('reports-link').href  = `/reports?client=${id}`;
+  document.getElementById('admin-link').href    = `/admin?client=${id}`;
 });
 
 function clearView() {

@@ -159,12 +159,16 @@
 <body>
 
 <header>
-  <a id="back-btn" href="/" class="btn btn-neutral btn-sm" style="text-decoration:none">← Dashboard</a>
+  <a id="home-link" href="/" class="btn btn-neutral btn-sm" style="text-decoration:none">← Home</a>
   <h1>💰 TCO Calculator</h1>
-  <span style="font-size:12px; color:var(--muted)">Total Cost of Ownership — three-scenario analysis</span>
-  <div id="header-actions" style="margin-left:auto; display:flex; gap:8px;">
+  <div style="margin-left:auto; display:flex; gap:6px; align-items:center;">
+    <a id="lifecycle-link" href="/lifecycle" class="btn btn-ghost btn-sm" style="text-decoration:none">Lifecycle</a>
+    <a id="planner-link"  href="/planner"   class="btn btn-ghost btn-sm" style="text-decoration:none">Planner</a>
+    <span class="btn btn-ghost btn-sm" style="font-weight:700; cursor:default;">TCO</span>
+    <a id="reports-link"  href="/reports"   class="btn btn-ghost btn-sm" style="text-decoration:none">Reports</a>
+    <a id="admin-link"    href="/admin"     class="btn btn-neutral btn-sm" style="text-decoration:none">Admin</a>
+    <span style="width:1px;height:18px;background:var(--border);display:inline-block;margin:0 2px;"></span>
     <button class="btn btn-ghost btn-sm" id="export-btn">⬇ Export CSV</button>
-    <button class="btn btn-ghost btn-sm theme-btn" onclick="toggleTheme()" title="Switch theme">☀</button>
   </div>
 </header>
 
@@ -343,11 +347,11 @@ document.getElementById('client-sel').addEventListener('change', async e => {
   if (!id) {
     renderRows();
     setStatus('');
-    document.getElementById('back-btn').href = '/';
+    setNavLinks('');
     return;
   }
 
-  document.getElementById('back-btn').href = `/?client=${id}`;
+  setNavLinks(id);
 
   if (activeScenario !== 'optimised') {
     setStatus(`Loading ${activeScenario === 'current' ? 'current' : 'future'} state…`);
@@ -881,9 +885,18 @@ document.getElementById('export-btn').addEventListener('click', () => {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 
+function setNavLinks(id) {
+  const s = id ? `?client=${id}` : '';
+  document.getElementById('home-link').href      = id ? `/?client=${id}` : '/';
+  document.getElementById('lifecycle-link').href = `/lifecycle${s}`;
+  document.getElementById('planner-link').href   = `/planner${s}`;
+  document.getElementById('reports-link').href   = `/reports${s}`;
+  document.getElementById('admin-link').href     = `/admin${s}`;
+}
+
 const urlParams    = new URLSearchParams(location.search);
 const urlClientId  = parseInt(urlParams.get('client'));
-if (urlClientId) document.getElementById('back-btn').href = `/?client=${urlClientId}`;
+if (urlClientId) setNavLinks(urlClientId);
 
 Promise.all([loadClients(), loadCatalogue()]).then(async () => {
   updateActionBar();

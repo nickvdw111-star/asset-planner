@@ -459,6 +459,14 @@ def get_version():
         ver = 'unknown'
     return jsonify({'version': ver, 'built': date.today().isoformat()})
 
+@app.route('/api/changelog')
+def get_changelog():
+    try:
+        text = open(os.path.join(os.path.dirname(__file__), 'CHANGELOG.md')).read()
+    except Exception:
+        text = ''
+    return text, 200, {'Content-Type': 'text/plain; charset=utf-8'}
+
 # ── Static pages ──────────────────────────────────────────────────────────────
 
 @app.route('/')

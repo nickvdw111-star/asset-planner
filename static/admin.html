@@ -661,12 +661,17 @@
       </div>
     </div>
 
-    <div style="background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:20px; text-align:left; font-size:12px; color:var(--muted); line-height:2;">
+    <div style="background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:20px; text-align:left; font-size:12px; color:var(--muted); line-height:2; margin-bottom:24px;">
       <div><b style="color:var(--muted2);">Versioning convention (SemVer)</b></div>
       <div>0.x.x &nbsp;→&nbsp; Pre-release / active development</div>
       <div>MINOR bump (0.1 → 0.2) &nbsp;→&nbsp; New features pushed to GitHub</div>
       <div>PATCH bump (0.2.0 → 0.2.1) &nbsp;→&nbsp; Bug fixes only</div>
       <div>1.0.0 &nbsp;→&nbsp; First stable production release</div>
+    </div>
+
+    <div style="width:100%; text-align:left;">
+      <div style="font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted2); margin-bottom:12px;">Changelog</div>
+      <div id="changelog-list"></div>
     </div>
   </div>
 </div>
@@ -1638,6 +1643,72 @@ async function loadAbout() {
     document.getElementById('about-stage').textContent   = stage;
     document.getElementById('about-date').textContent    = built;
   } catch { /* non-fatal */ }
+
+  try {
+    const text = await fetch('/api/changelog').then(r => r.text());
+    renderChangelog(text);
+  } catch { /* non-fatal */ }
+}
+
+function renderChangelog(text) {
+  const container = document.getElementById('changelog-list');
+  container.innerHTML = '';
+
+  // Split into version blocks on ## [x.x.x] headings
+  const blocks = text.split(/^## /m).filter(b => b.trim().startsWith('['));
+
+  const typeStyles = {
+    'Added':      { bg: '#14291e', color: '#86efac' },
+    'Fixed':      { bg: '#1c1407', color: '#fbbf24' },
+    'Changed':    { bg: '#1a1f3a', color: '#93c5fd' },
+    'Removed':    { bg: '#2d0f0f', color: '#fca5a5' },
+    'Deprecated': { bg: '#2d1f0a', color: '#fb923c' },
+  };
+
+  blocks.forEach(block => {
+    const lines  = block.trim().split('\n');
+    const header = lines[0]; // e.g. [0.1.1] - 2026-06-07
+    const match  = header.match(/\[([^\]]+)\]\s*-?\s*([\d-]*)/);
+    if (!match) return;
+
+    const [, ver, dateStr] = match;
+    const card = document.createElement('div');
+    card.style.cssText = 'background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:12px;';
+
+    const cardHeader = document.createElement('div');
+    cardHeader.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:12px;';
+    cardHeader.innerHTML = `
+      <span style="font-size:15px;font-weight:700;font-family:monospace;color:var(--accent-h);">v${ver}</span>
+      ${dateStr ? `<span style="font-size:11px;color:var(--muted);">${dateStr}</span>` : ''}
+    `;
+    card.appendChild(cardHeader);
+
+    // Parse ### Type sections
+    const sections = block.split(/^### /m).slice(1);
+    sections.forEach(section => {
+      const [typeLine, ...itemLines] = section.trim().split('\n');
+      const type   = typeLine.trim();
+      const style  = typeStyles[type] || { bg: 'var(--surface)', color: 'var(--muted)' };
+      const items  = itemLines.filter(l => l.trim().startsWith('-')).map(l => l.replace(/^-\s*/, '').trim());
+      if (!items.length) return;
+
+      const badge = document.createElement('span');
+      badge.style.cssText = `display:inline-block;background:${style.bg};color:${style.color};font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:2px 8px;border-radius:8px;margin-bottom:6px;`;
+      badge.textContent = type;
+      card.appendChild(badge);
+
+      const ul = document.createElement('ul');
+      ul.style.cssText = 'margin:0 0 10px 16px;padding:0;font-size:12px;color:var(--muted);line-height:1.8;list-style:disc;';
+      items.forEach(item => {
+        const li = document.createElement('li');
+        li.textContent = item;
+        ul.appendChild(li);
+      });
+      card.appendChild(ul);
+    });
+
+    container.appendChild(card);
+  });
 }
 </script>
 </body>

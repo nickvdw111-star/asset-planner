@@ -2,6 +2,7 @@ import calendar
 import csv
 import io
 import os
+import shutil
 import uuid
 from datetime import date
 from pathlib import Path
@@ -167,6 +168,10 @@ def init_db():
         flcols = [r[1] for r in db.execute('PRAGMA table_info(floors)').fetchall()]
         if 'level' not in flcols:
             db.execute('ALTER TABLE floors ADD COLUMN level INTEGER NOT NULL DEFAULT 0')
+        if 'source_floor_id' not in flcols:
+            db.execute('ALTER TABLE floors ADD COLUMN source_floor_id INTEGER REFERENCES floors(id)')
+        if 'scenario_name' not in flcols:
+            db.execute("ALTER TABLE floors ADD COLUMN scenario_name TEXT")
 
         # Add unique constraint on models(brand_id, name) if not already present
         # SQLite doesn't support ADD CONSTRAINT, so we check via index
@@ -1017,6 +1022,76 @@ def delete_floor(floor_id):
             _delete_file(floor['floorplan_path'])
         db.execute('DELETE FROM floors WHERE id = ?', (floor_id,))
     return '', 204
+
+
+# ── Floor scenarios (clone / list) ───────────────────────────────────────────
+
+@app.route('/api/floors/<int:floor_id>/scenarios', methods=['GET'])
+def get_floor_scenarios(floor_id):
+    with get_db() as db:
+        floor = db.execute('SELECT * FROM floors WHERE id = ?', (floor_id,)).fetchone()
+        if not floor:
+            return jsonify({'error': 'Not found'}), 404
+        root_id = floor['source_floor_id'] or floor['id']
+        original = db.execute('SELECT * FROM floors WHERE id = ?', (root_id,)).fetchone()
+        replacements = db.execute(
+            'SELECT * FROM floors WHERE source_floor_id = ? ORDER BY id', (root_id,)
+        ).fetchall()
+    return jsonify({
+        'original':     dict(original),
+        'replacements': [dict(r) for r in replacements],
+        'current_id':   floor_id,
+    })
+
+
+@app.route('/api/floors/<int:floor_id>/clone', methods=['POST'])
+def clone_floor(floor_id):
+    data  = request.json or {}
+    name  = data.get('name', '').strip() or None
+    with get_db() as db:
+        src = db.execute('SELECT * FROM floors WHERE id = ?', (floor_id,)).fetchone()
+        if not src:
+            return jsonify({'error': 'Floor not found'}), 404
+        # Always clone FROM the original (root), not from an existing clone
+        root_id = src['source_floor_id'] or src['id']
+        root    = db.execute('SELECT * FROM floors WHERE id = ?', (root_id,)).fetchone()
+        # Count existing replacements to auto-name
+        if not name:
+            count = db.execute(
+                'SELECT COUNT(*) FROM floors WHERE source_floor_id = ?', (root_id,)
+            ).fetchone()[0]
+            name = f'Replacement {count + 1}'
+        cur = db.execute(
+            'INSERT INTO floors (building_id, level, label, source_floor_id, scenario_name) VALUES (?, ?, ?, ?, ?)',
+            (root['building_id'], root['level'], root['label'], root_id, name)
+        )
+        new_id = cur.lastrowid
+        # Copy floor plan file
+        if root['floorplan_path']:
+            src_path = UPLOAD_DIR / root['floorplan_path']
+            if src_path.exists():
+                ext = src_path.suffix
+                new_filename = f'floor_{new_id}{ext}'
+                shutil.copy2(src_path, UPLOAD_DIR / new_filename)
+                db.execute('UPDATE floors SET floorplan_path = ? WHERE id = ?', (new_filename, new_id))
+        # Copy all devices from root floor
+        devs = db.execute('SELECT * FROM devices WHERE floor_id = ?', (root_id,)).fetchall()
+        for d in devs:
+            db.execute(
+                '''INSERT INTO devices
+                   (id, floor_id, type, label, brand, model, serial, notes,
+                    avg_mono, avg_colour, x_pct, y_pct,
+                    mono_rate, colour_rate, rental_amount, rental_period,
+                    contract_start_date, finance_cost, flagged_for_replacement, vendor_id)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+                (str(uuid.uuid4()), new_id,
+                 d['type'], d['label'], d['brand'], d['model'], d['serial'], d['notes'],
+                 d['avg_mono'], d['avg_colour'], d['x_pct'], d['y_pct'],
+                 d['mono_rate'], d['colour_rate'], d['rental_amount'], d['rental_period'],
+                 d['contract_start_date'], d['finance_cost'], d['flagged_for_replacement'], d['vendor_id'])
+            )
+        new_floor = db.execute('SELECT * FROM floors WHERE id = ?', (new_id,)).fetchone()
+    return jsonify(dict(new_floor)), 201
 
 
 # ── Floor plan upload / serve ─────────────────────────────────────────────────

@@ -190,6 +190,39 @@
 
     /* ── Compare pane ── */
     #compare-pane { flex-direction: column; overflow-y: auto; padding: 24px 28px; gap: 20px; }
+
+    /* ── Theme picker ── */
+    .theme-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+    .theme-card {
+      background: var(--surface2);
+      border: 2px solid var(--border2);
+      border-radius: 10px;
+      padding: 16px;
+      cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .theme-card:hover { border-color: var(--muted); }
+    .theme-card.active {
+      border-color: var(--accent-h);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-h) 20%, transparent);
+    }
+    .theme-swatches {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 10px;
+    }
+    .theme-swatches span {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .theme-name { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+    .theme-desc { font-size: 11px; color: var(--muted); }
     .cmp-models-row { display: grid; grid-template-columns: 1fr 40px 1fr; gap: 0; align-items: start; max-width: 900px; }
     .cmp-vs { display: flex; align-items: center; justify-content: center; padding-top: 36px;
               font-size: 13px; font-weight: 700; color: var(--muted); }
@@ -268,7 +301,7 @@
   <a id="back-btn" href="/" class="btn btn-neutral btn-sm" style="text-decoration:none">← Dashboard</a>
   <h1>⚙️ Admin</h1>
   <span style="font-size:12px; color:var(--muted)">Catalogue, fleet import, and pricing management</span>
-  <button class="btn btn-ghost btn-sm theme-btn" onclick="toggleTheme()" style="margin-left:auto" title="Switch theme">☀</button>
+  <div style="margin-left:auto"></div>
 </header>
 
 <div id="top-tabs">
@@ -277,6 +310,7 @@
   <div class="ttab" id="tab-import"    onclick="switchTab('import')">Fleet Import</div>
   <div class="ttab" id="tab-rates"     onclick="switchTab('rates')">Rates</div>
   <div class="ttab" id="tab-vendors"   onclick="switchTab('vendors')">Service Agents</div>
+  <div class="ttab" id="tab-themes"    onclick="switchTab('themes')">Themes</div>
   <div class="ttab" id="tab-about"     onclick="switchTab('about')">About</div>
 </div>
 
@@ -640,7 +674,83 @@
 </div>
 
 <!-- ── About pane ── -->
-<div id="about-pane" class="tab-pane" style="flex-direction:column; align-items:center; justify-content:center; gap:0;">
+<div id="themes-pane" class="tab-pane" style="flex-direction:column; overflow-y:auto; padding:32px;">
+  <div style="max-width:600px; width:100%;">
+    <h2 style="font-size:16px; font-weight:700; margin-bottom:6px;">Colour Theme</h2>
+    <p style="font-size:12px; color:var(--muted); margin-bottom:24px;">Choose a colour scheme. Your preference is saved in the browser.</p>
+    <div class="theme-grid">
+
+      <div class="theme-card" data-theme="dark" onclick="setTheme('dark')">
+        <div class="theme-swatches">
+          <span style="background:#12141a;" title="Background"></span>
+          <span style="background:#1c1f2b;" title="Surface"></span>
+          <span style="background:#22c55e;" title="Accent"></span>
+          <span style="background:#e0e0e0;" title="Text"></span>
+        </div>
+        <div class="theme-name">Dark</div>
+        <div class="theme-desc">Default — charcoal with green</div>
+      </div>
+
+      <div class="theme-card" data-theme="light" onclick="setTheme('light')">
+        <div class="theme-swatches">
+          <span style="background:#f8fafc; border:1px solid #e2e8f0;" title="Background"></span>
+          <span style="background:#ffffff; border:1px solid #e2e8f0;" title="Surface"></span>
+          <span style="background:#16a34a;" title="Accent"></span>
+          <span style="background:#0f172a;" title="Text"></span>
+        </div>
+        <div class="theme-name">Light</div>
+        <div class="theme-desc">Clean white with green</div>
+      </div>
+
+      <div class="theme-card" data-theme="midnight" onclick="setTheme('midnight')">
+        <div class="theme-swatches">
+          <span style="background:#080c18;" title="Background"></span>
+          <span style="background:#0f1629;" title="Surface"></span>
+          <span style="background:#60a5fa;" title="Accent"></span>
+          <span style="background:#dde6f5;" title="Text"></span>
+        </div>
+        <div class="theme-name">Midnight</div>
+        <div class="theme-desc">Deep navy with blue</div>
+      </div>
+
+      <div class="theme-card" data-theme="slate" onclick="setTheme('slate')">
+        <div class="theme-swatches">
+          <span style="background:#0d0d14;" title="Background"></span>
+          <span style="background:#15151f;" title="Surface"></span>
+          <span style="background:#a78bfa;" title="Accent"></span>
+          <span style="background:#e2e0f0;" title="Text"></span>
+        </div>
+        <div class="theme-name">Slate</div>
+        <div class="theme-desc">Dark neutral with violet</div>
+      </div>
+
+      <div class="theme-card" data-theme="ember" onclick="setTheme('ember')">
+        <div class="theme-swatches">
+          <span style="background:#120e08;" title="Background"></span>
+          <span style="background:#1c160e;" title="Surface"></span>
+          <span style="background:#fb923c;" title="Accent"></span>
+          <span style="background:#f0e8d8;" title="Text"></span>
+        </div>
+        <div class="theme-name">Ember</div>
+        <div class="theme-desc">Warm dark with amber</div>
+      </div>
+
+      <div class="theme-card" data-theme="sage" onclick="setTheme('sage')">
+        <div class="theme-swatches">
+          <span style="background:#080f0c;" title="Background"></span>
+          <span style="background:#0e1812;" title="Surface"></span>
+          <span style="background:#2dd4bf;" title="Accent"></span>
+          <span style="background:#dff0e8;" title="Text"></span>
+        </div>
+        <div class="theme-name">Sage</div>
+        <div class="theme-desc">Forest green with teal</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div id="about-pane" class="tab-pane" style="flex-direction:column; align-items:center; overflow-y:auto; gap:0;">
   <div style="max-width:480px; width:100%; padding:40px 24px; text-align:center;">
     <div style="font-size:52px; margin-bottom:16px;">🖨</div>
     <h2 style="font-size:22px; font-weight:700; margin-bottom:6px;">PrintMap</h2>
@@ -688,11 +798,12 @@ let activeTab = 'catalogue';
 
 function switchTab(tab) {
   activeTab = tab;
-  ['catalogue', 'compare', 'import', 'rates', 'vendors', 'about'].forEach(t => {
+  ['catalogue', 'compare', 'import', 'rates', 'vendors', 'themes', 'about'].forEach(t => {
     document.getElementById('tab-' + t).classList.toggle('active', tab === t);
     document.getElementById(t + '-pane').classList.toggle('active', tab === t);
   });
   if (tab === 'vendors') loadVendors();
+  if (tab === 'themes')  _syncThemeUI();
   if (tab === 'about')   loadAbout();
 }
 

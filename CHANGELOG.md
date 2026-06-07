@@ -4,6 +4,18 @@ All notable changes to PrintMap are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [0.2.1] - 2026-06-07
+### Added
+- Replacement Scenario feature in Planner: click "+ Replacement" to clone the current floor (floor plan + all devices) as a new scenario tab; create as many as needed; delete any replacement with ×
+- Scenario bar appears below the planner header whenever one or more replacements exist, showing Original and Replacement tabs for quick switching
+- Export PNG, Export List, and Print moved from the header into the sidebar
+- Upload / Replace floor plan moved from the header into the sidebar
+- Themes section added to Admin: six colour themes (Dark, Light, Midnight, Slate, Ember, Sage) selectable via visual palette cards; choice is persisted in localStorage
+- Changelog section on About tab is now scrollable
+
+### Fixed
+- About tab content was clipped when changelog was long (overflow: hidden replaced with overflow-y: auto)
+
 ## [0.2.0] - 2026-06-07
 ### Added
 - Landing page redesigned as a client hub home screen: stats strip (clients, buildings, devices), client card grid with search, and a "+ New Client" add card

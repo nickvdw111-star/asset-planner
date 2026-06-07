@@ -1,22 +1,36 @@
-// Run the IIFE immediately so there's no flash; the full logic fires on DOMContentLoaded.
+// Apply saved theme immediately to prevent flash.
 (function () {
   var t = localStorage.getItem('printmap-theme') || 'dark';
   document.documentElement.setAttribute('data-theme', t);
 })();
 
-function toggleTheme() {
-  var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', next);
-  localStorage.setItem('printmap-theme', next);
-  _syncThemeButtons();
+function setTheme(name) {
+  document.documentElement.setAttribute('data-theme', name);
+  localStorage.setItem('printmap-theme', name);
+  _syncThemeUI();
 }
 
-function _syncThemeButtons() {
-  var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+function getTheme() {
+  return document.documentElement.getAttribute('data-theme') || 'dark';
+}
+
+// Kept for backwards compat with any remaining toggle buttons.
+function toggleTheme() {
+  setTheme(getTheme() === 'light' ? 'dark' : 'light');
+}
+
+function _syncThemeUI() {
+  var theme = getTheme();
+  var isDark = theme !== 'light';
+  // Old ☀/🌙 toggle buttons
   document.querySelectorAll('.theme-btn').forEach(function (b) {
     b.textContent = isDark ? '☀' : '🌙';
     b.title = isDark ? 'Switch to light mode' : 'Switch to dark mode';
   });
+  // Theme picker cards in Admin
+  document.querySelectorAll('.theme-card').forEach(function (c) {
+    c.classList.toggle('active', c.dataset.theme === theme);
+  });
 }
 
-document.addEventListener('DOMContentLoaded', _syncThemeButtons);
+document.addEventListener('DOMContentLoaded', _syncThemeUI);

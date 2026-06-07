@@ -199,7 +199,7 @@
 
 <div id="scenario-tabs">
   <div class="stab active" data-scenario="current"   onclick="switchScenario('current')">Current State</div>
-  <div id="replacement-tabs"></div>
+  <div id="replacement-tabs" style="display:contents"></div>
   <div class="stab"        data-scenario="optimised" onclick="switchScenario('optimised')">Optimised</div>
 </div>
 
@@ -482,19 +482,16 @@ async function switchScenario(name) {
 
   const tablePanel = document.getElementById('table-panel');
   const optPanel   = document.getElementById('opt-panel');
-  const hdrActions = document.getElementById('header-actions');
 
   if (name === 'optimised') {
     tablePanel.style.display = 'none';
     optPanel.classList.add('active');
-    hdrActions.style.display = 'none';
     updateActionBar();
     return;
   }
 
   tablePanel.style.display = '';
   optPanel.classList.remove('active');
-  hdrActions.style.display = '';
   updateActionBar();
 
   if (!scenarios[name]) scenarios[name] = { rows: [], loaded: false };
@@ -985,7 +982,6 @@ function renderOptimised(data) {
 function showOptimised() {
   document.getElementById('table-panel').style.display = 'none';
   document.getElementById('opt-panel').classList.add('active');
-  document.getElementById('header-actions').style.display = 'none';
 }
 
 // ── Export CSV ────────────────────────────────────────────────────────────────

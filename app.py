@@ -104,6 +104,20 @@ def init_db():
                 rental      REAL,
                 period      TEXT
             );
+            CREATE TABLE IF NOT EXISTS vendors (
+                id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+                name                     TEXT NOT NULL,
+                type                     TEXT NOT NULL DEFAULT 'GO',
+                city                     TEXT NOT NULL DEFAULT '',
+                lat                      REAL,
+                lng                      REAL,
+                admin_name               TEXT NOT NULL DEFAULT '',
+                admin_phone              TEXT NOT NULL DEFAULT '',
+                tech_manager_name        TEXT NOT NULL DEFAULT '',
+                tech_manager_phone       TEXT NOT NULL DEFAULT '',
+                service_controller_name  TEXT NOT NULL DEFAULT '',
+                service_controller_phone TEXT NOT NULL DEFAULT ''
+            );
         ''')
         # Migrate existing databases
         mcols = [r[1] for r in db.execute('PRAGMA table_info(models)').fetchall()]
@@ -121,6 +135,8 @@ def init_db():
             db.execute('ALTER TABLE models ADD COLUMN rental_amount REAL')
         if 'device_type' not in mcols:
             db.execute("ALTER TABLE models ADD COLUMN device_type TEXT DEFAULT 'mfp'")
+        if 'speed_ppm' not in mcols:
+            db.execute('ALTER TABLE models ADD COLUMN speed_ppm INTEGER')
 
         cols = [r[1] for r in db.execute('PRAGMA table_info(devices)').fetchall()]
         if 'avg_mono' not in cols:
@@ -141,6 +157,8 @@ def init_db():
             db.execute("ALTER TABLE devices ADD COLUMN finance_cost REAL")
         if 'flagged_for_replacement' not in cols:
             db.execute("ALTER TABLE devices ADD COLUMN flagged_for_replacement INTEGER NOT NULL DEFAULT 0")
+        if 'vendor_id' not in cols:
+            db.execute('ALTER TABLE devices ADD COLUMN vendor_id INTEGER REFERENCES vendors(id)')
         bcols = [r[1] for r in db.execute('PRAGMA table_info(buildings)').fetchall()]
         if 'lat' not in bcols:
             db.execute('ALTER TABLE buildings ADD COLUMN lat REAL')
@@ -265,12 +283,38 @@ def init_db():
                 'KX-MB2120', 'KX-MB2130', 'KX-MB2170', 'DP-MB310',
             ],
             'Ricoh': [
-                'IM 2702', 'IM 3300', 'IM 4000', 'IM 5000', 'IM 6000',
-                'IM C2000', 'IM C2500', 'IM C3000', 'IM C3500', 'IM C4500', 'IM C5500', 'IM C6000',
-                'MP 2014', 'MP 301', 'MP 501SPF',
-                'MP C2004ex', 'MP C2504ex', 'MP C3004ex', 'MP C3504ex',
-                'MP C4504ex', 'MP C5504ex', 'MP C6004ex',
-                'SP 311SFNw', 'SP 325SFNw', 'SP 377SFNw',
+                # IM C series — colour, A3 MFP
+                {'name': 'IM C2000',   'colour_type': 'colour', 'page_size': 'A3', 'speed_ppm': 20},
+                {'name': 'IM C2010',   'colour_type': 'colour', 'page_size': 'A3', 'speed_ppm': 20},
+                {'name': 'IM C2500',   'colour_type': 'colour', 'page_size': 'A3', 'speed_ppm': 25},
+                {'name': 'IM C3000',   'colour_type': 'colour', 'page_size': 'A3', 'speed_ppm': 30},
+                {'name': 'IM C3010',   'colour_type': 'colour', 'page_size': 'A3', 'speed_ppm': 30},
+                {'name': 'IM C3500',   'colour_type': 'colour', 'page_size': 'A3', 'speed_ppm': 35},
+                {'name': 'IM C4500',   'colour_type': 'colour', 'page_size': 'A3', 'speed_ppm': 45},
+                {'name': 'IM C5500',   'colour_type': 'colour', 'page_size': 'A3', 'speed_ppm': 55},
+                {'name': 'IM C6000',   'colour_type': 'colour', 'page_size': 'A3', 'speed_ppm': 60},
+                # IM series — mono, A3 MFP
+                {'name': 'IM 2702',    'colour_type': 'mono',   'page_size': 'A3', 'speed_ppm': 27},
+                {'name': 'IM 3300',    'colour_type': 'mono',   'page_size': 'A3', 'speed_ppm': 33},
+                {'name': 'IM 4000',    'colour_type': 'mono',   'page_size': 'A3', 'speed_ppm': 40},
+                {'name': 'IM 5000',    'colour_type': 'mono',   'page_size': 'A3', 'speed_ppm': 50},
+                {'name': 'IM 6000',    'colour_type': 'mono',   'page_size': 'A3', 'speed_ppm': 60},
+                # MP C series — colour, A3 MFP
+                {'name': 'MP C2004ex', 'colour_type': 'colour', 'page_size': 'A3', 'speed_ppm': 20},
+                {'name': 'MP C2504ex', 'colour_type': 'colour', 'page_size': 'A3', 'speed_ppm': 25},
+                {'name': 'MP C3004ex', 'colour_type': 'colour', 'page_size': 'A3', 'speed_ppm': 30},
+                {'name': 'MP C3504ex', 'colour_type': 'colour', 'page_size': 'A3', 'speed_ppm': 35},
+                {'name': 'MP C4504ex', 'colour_type': 'colour', 'page_size': 'A3', 'speed_ppm': 45},
+                {'name': 'MP C5504ex', 'colour_type': 'colour', 'page_size': 'A3', 'speed_ppm': 55},
+                {'name': 'MP C6004ex', 'colour_type': 'colour', 'page_size': 'A3', 'speed_ppm': 60},
+                # MP desktop — mono
+                {'name': 'MP 2014',    'colour_type': 'mono',   'page_size': 'A4', 'speed_ppm': 20},
+                {'name': 'MP 301',     'colour_type': 'mono',   'page_size': 'A4', 'speed_ppm': 30},
+                {'name': 'MP 501SPF',  'colour_type': 'mono',   'page_size': 'A3', 'speed_ppm': 50},
+                # SP series — mono, A4
+                {'name': 'SP 311SFNw', 'colour_type': 'mono',   'page_size': 'A4', 'speed_ppm': None},
+                {'name': 'SP 325SFNw', 'colour_type': 'mono',   'page_size': 'A4', 'speed_ppm': None},
+                {'name': 'SP 377SFNw', 'colour_type': 'mono',   'page_size': 'A4', 'speed_ppm': None},
             ],
             'Riso': [
                 'ComColor GD7330', 'ComColor GD9630', 'ComColor GL9730',
@@ -339,16 +383,64 @@ def init_db():
             if not row:
                 continue
             brand_id = row['id']
-            for model_name in models:
+            for entry in models:
+                if isinstance(entry, dict):
+                    model_name  = entry['name']
+                    colour_type = entry.get('colour_type', 'mono')
+                    page_size   = entry.get('page_size', 'A4')
+                    speed_ppm   = entry.get('speed_ppm')
+                else:
+                    model_name  = entry
+                    colour_type = 'mono'
+                    page_size   = 'A4'
+                    speed_ppm   = None
                 db.execute('''
-                    INSERT INTO models (brand_id, name)
-                    SELECT ?, ? WHERE NOT EXISTS (
+                    INSERT INTO models (brand_id, name, colour_type, page_size, speed_ppm)
+                    SELECT ?, ?, ?, ?, ? WHERE NOT EXISTS (
                         SELECT 1 FROM models WHERE brand_id = ? AND name = ?
                     )
-                ''', (brand_id, model_name, brand_id, model_name))
+                ''', (brand_id, model_name, colour_type, page_size, speed_ppm, brand_id, model_name))
+                if speed_ppm is not None:
+                    db.execute('''
+                        UPDATE models SET speed_ppm = ?
+                        WHERE brand_id = ? AND name = ? AND speed_ppm IS NULL
+                    ''', (speed_ppm, brand_id, model_name))
+
+        # Correct Ricoh model classification — IM C / MP C are colour A3;
+        # IM and MP series without C are mono A3. Runs every startup (idempotent).
+        ricoh = db.execute("SELECT id FROM brands WHERE name='Ricoh'").fetchone()
+        if ricoh:
+            rid = ricoh['id']
+            db.execute(
+                "UPDATE models SET colour_type='colour', page_size='A3' "
+                "WHERE brand_id=? AND (name LIKE 'IM C%' OR name LIKE 'MP C%')",
+                (rid,)
+            )
+            db.execute(
+                "UPDATE models SET colour_type='mono', page_size='A3' "
+                "WHERE brand_id=? AND name IN ('IM 2702','IM 3300','IM 4000','IM 5000','IM 6000','MP 501SPF')",
+                (rid,)
+            )
 
 
 init_db()
+
+
+_RICOH_FAMILY = {'Ricoh', 'Infotec', 'Lanier', 'Nashuatec', 'Savin', 'Gestetner'}
+_MONO_A4_MODELS = {'MP 2014', 'MP 301', 'SP 311SFNw', 'SP 325SFNw', 'SP 377SFNw'}
+
+def infer_classification(brand_name, model_name):
+    """Return (colour_type, page_size) inferred from brand+model name, or (None, None)."""
+    if brand_name not in _RICOH_FAMILY:
+        return None, None
+    n = model_name.strip()
+    if n in _MONO_A4_MODELS:
+        return 'mono', 'A4'
+    if n.startswith('IM C') or n.startswith('MP C'):
+        return 'colour', 'A3'
+    if n.startswith('IM ') or n.startswith('MP '):
+        return 'mono', 'A3'
+    return None, None
 
 
 def floor_label(level):
@@ -429,16 +521,20 @@ def create_model(brand_id):
     name = d.get('name', '').strip()
     if not name:
         return jsonify({'error': 'name required'}), 400
-    colour_type   = d.get('colour_type', 'mono')
-    page_size     = d.get('page_size', 'A4')
     device_type   = d.get('device_type', 'mfp')
     mono_rate     = d.get('mono_rate') or None
     colour_rate   = d.get('colour_rate') or None
     rental_amount = d.get('rental_amount') or None
+    speed_ppm     = d.get('speed_ppm') or None
     with get_db() as db:
+        brand_row   = db.execute('SELECT name FROM brands WHERE id=?', (brand_id,)).fetchone()
+        brand_name  = brand_row['name'] if brand_row else ''
+        inf_ct, inf_ps = infer_classification(brand_name, name)
+        colour_type = d.get('colour_type') or inf_ct or 'mono'
+        page_size   = d.get('page_size')   or inf_ps or 'A4'
         cur = db.execute(
-            'INSERT INTO models (brand_id, name, colour_type, page_size, device_type, mono_rate, colour_rate, rental_amount) VALUES (?,?,?,?,?,?,?,?)',
-            (brand_id, name, colour_type, page_size, device_type, mono_rate, colour_rate, rental_amount)
+            'INSERT INTO models (brand_id, name, colour_type, page_size, device_type, mono_rate, colour_rate, rental_amount, speed_ppm) VALUES (?,?,?,?,?,?,?,?,?)',
+            (brand_id, name, colour_type, page_size, device_type, mono_rate, colour_rate, rental_amount, speed_ppm)
         )
         row = db.execute('SELECT * FROM models WHERE id = ?', (cur.lastrowid,)).fetchone()
     return jsonify(dict(row)), 201
@@ -456,10 +552,11 @@ def update_model(model_id):
     colour_rate       = d.get('colour_rate') or None
     rental_amount     = d.get('rental_amount') or None
     optimiser_allowed = 1 if d.get('optimiser_allowed') else 0
+    speed_ppm         = d.get('speed_ppm') or None
     with get_db() as db:
         db.execute(
-            'UPDATE models SET name=?, colour_type=?, page_size=?, device_type=?, mono_rate=?, colour_rate=?, rental_amount=?, optimiser_allowed=? WHERE id=?',
-            (name, colour_type, page_size, device_type, mono_rate, colour_rate, rental_amount, optimiser_allowed, model_id)
+            'UPDATE models SET name=?, colour_type=?, page_size=?, device_type=?, mono_rate=?, colour_rate=?, rental_amount=?, optimiser_allowed=?, speed_ppm=? WHERE id=?',
+            (name, colour_type, page_size, device_type, mono_rate, colour_rate, rental_amount, optimiser_allowed, speed_ppm, model_id)
         )
         row = db.execute('SELECT * FROM models WHERE id = ?', (model_id,)).fetchone()
     return jsonify(dict(row))
@@ -470,6 +567,71 @@ def delete_model(model_id):
         db.execute('DELETE FROM models WHERE id = ?', (model_id,))
     return '', 204
 
+
+# ── Vendors / Service Agents ──────────────────────────────────────────────────
+
+VENDOR_FIELDS = ('name','type','city','lat','lng',
+                 'admin_name','admin_phone',
+                 'tech_manager_name','tech_manager_phone',
+                 'service_controller_name','service_controller_phone')
+
+@app.route('/api/vendors', methods=['GET'])
+def list_vendors():
+    with get_db() as db:
+        rows = db.execute('SELECT * FROM vendors ORDER BY name').fetchall()
+    return jsonify([dict(r) for r in rows])
+
+@app.route('/api/vendors', methods=['POST'])
+def create_vendor():
+    d = request.json or {}
+    with get_db() as db:
+        cur = db.execute(
+            '''INSERT INTO vendors (name,type,city,lat,lng,
+               admin_name,admin_phone,tech_manager_name,tech_manager_phone,
+               service_controller_name,service_controller_phone)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
+            (_str(d,'name'), d.get('type','GO'), _str(d,'city'),
+             _flt(d,'lat'), _flt(d,'lng'),
+             _str(d,'admin_name'), _str(d,'admin_phone'),
+             _str(d,'tech_manager_name'), _str(d,'tech_manager_phone'),
+             _str(d,'service_controller_name'), _str(d,'service_controller_phone'))
+        )
+        row = db.execute('SELECT * FROM vendors WHERE id=?', (cur.lastrowid,)).fetchone()
+    return jsonify(dict(row)), 201
+
+@app.route('/api/vendors/<int:vid>', methods=['PUT'])
+def update_vendor(vid):
+    d = request.json or {}
+    with get_db() as db:
+        db.execute(
+            '''UPDATE vendors SET name=?,type=?,city=?,lat=?,lng=?,
+               admin_name=?,admin_phone=?,tech_manager_name=?,tech_manager_phone=?,
+               service_controller_name=?,service_controller_phone=?
+               WHERE id=?''',
+            (_str(d,'name'), d.get('type','GO'), _str(d,'city'),
+             _flt(d,'lat'), _flt(d,'lng'),
+             _str(d,'admin_name'), _str(d,'admin_phone'),
+             _str(d,'tech_manager_name'), _str(d,'tech_manager_phone'),
+             _str(d,'service_controller_name'), _str(d,'service_controller_phone'),
+             vid)
+        )
+        row = db.execute('SELECT * FROM vendors WHERE id=?', (vid,)).fetchone()
+    if not row:
+        abort(404)
+    return jsonify(dict(row))
+
+@app.route('/api/vendors/<int:vid>', methods=['DELETE'])
+def delete_vendor(vid):
+    with get_db() as db:
+        db.execute('UPDATE devices SET vendor_id=NULL WHERE vendor_id=?', (vid,))
+        db.execute('DELETE FROM vendors WHERE id=?', (vid,))
+    return '', 204
+
+def _str(d, k): return str(d.get(k) or '').strip()
+def _flt(d, k):
+    v = d.get(k)
+    try: return float(v) if v not in (None, '') else None
+    except: return None
 
 # ── Clients ───────────────────────────────────────────────────────────────────
 
@@ -732,7 +894,7 @@ def get_floor(floor_id):
     with get_db() as db:
         row = db.execute('''
             SELECT f.id, f.label, f.floorplan_path,
-                   b.name AS building_name,
+                   b.name AS building_name, b.lat AS building_lat, b.lng AS building_lng,
                    ci.name AS city_name,
                    c.name  AS client_name
             FROM floors f
@@ -840,7 +1002,7 @@ def update_device(device_id):
             UPDATE devices
             SET floor_id=?, type=?, label=?, brand=?, model=?, serial=?, notes=?, avg_mono=?, avg_colour=?,
                 mono_rate=?, colour_rate=?, rental_amount=?, rental_period=?, contract_start_date=?,
-                finance_cost=?, flagged_for_replacement=?, x_pct=?, y_pct=?
+                finance_cost=?, flagged_for_replacement=?, x_pct=?, y_pct=?, vendor_id=?
             WHERE id=?
         ''', (
             floor_id,
@@ -854,6 +1016,7 @@ def update_device(device_id):
             d.get('finance_cost') or None,
             1 if d.get('flagged_for_replacement') else 0,
             d.get('x_pct'), d.get('y_pct'),
+            d.get('vendor_id') or None,
             device_id,
         ))
         row = db.execute('SELECT * FROM devices WHERE id = ?', (device_id,)).fetchone()

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Floor Planner</title>
+  <title>Floor Planner — PrintMap</title>
   <script src="theme.js"></script>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -37,6 +37,11 @@
     /* ── Zoom bar ── */
     #zoom-bar { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
     #zoom-bar input { width: 72px; accent-color: var(--accent); }
+
+    /* ── Hand tool ── */
+    #hand-tool-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    #canvas-area.pan-mode { cursor: grab; }
+    #canvas-area.pan-mode.panning { cursor: grabbing; }
 
     /* ── Workspace ── */
     .workspace { display: flex; flex: 1; overflow: hidden; }
@@ -203,7 +208,7 @@
     select.input option { background: #1c1f2b; color: #e0e0e0; }
 
     /* ── Edit modal ── */
-    #edit-modal .modal { width: 380px; }
+    #edit-modal .modal { width: 380px; max-height: 90vh; overflow-y: auto; }
 
     /* ── Inline add ── */
     .select-with-add { display: flex; gap: 6px; align-items: center; }
@@ -219,14 +224,15 @@
 
 <header>
   <a id="back-btn" href="/" class="btn btn-neutral btn-sm" style="text-decoration:none">← Dashboard</a>
-  <h1>🖨 Floor Planner</h1>
+  <h1>PrintMap</h1>
   <span id="floor-label">Loading…</span>
-  <button class="btn btn-ghost btn-sm theme-btn" onclick="toggleTheme()" style="margin-left:auto" title="Switch theme">☀</button>
-
-  <div id="zoom-bar" title="PDF render zoom">
+  <button class="btn btn-ghost btn-sm" id="hand-tool-btn" style="margin-left:auto" title="Hand tool — pan the map (or hold Space)">✋</button>
+  <div id="zoom-bar" title="Zoom  (+/= zoom in · − zoom out · 0 reset)">
     🔍
-    <input type="range" id="zoom-slider" min="0.5" max="3" step="0.25" value="1.5">
-    <span id="zoom-label">1.5×</span>
+    <button class="btn btn-ghost btn-sm" id="zoom-out-btn" title="Zoom out">−</button>
+    <input type="range" id="zoom-slider" min="0.25" max="3" step="0.25" value="1">
+    <button class="btn btn-ghost btn-sm" id="zoom-in-btn" title="Zoom in">+</button>
+    <span id="zoom-label">1×</span>
   </div>
 
   <button class="btn btn-neutral btn-sm" id="prev-page-btn" disabled>‹</button>
@@ -378,6 +384,13 @@
       </div>
     </div>
     <div class="modal-field">
+      <label>Service Agent</label>
+      <select id="modal-vendor" class="input">
+        <option value="">— None —</option>
+      </select>
+      <div id="modal-vendor-distance" style="margin-top:5px; font-size:11px; color:var(--accent-h); display:none;"></div>
+    </div>
+    <div class="modal-field">
       <label>Notes</label>
       <textarea id="modal-notes" class="input" placeholder="e.g. Shared with finance team, needs toner end of month"></textarea>
     </div>
@@ -409,9 +422,16 @@ let devices      = [];
 let counters     = {};
 let pdfDoc       = null;
 let pageNum      = 1;
-let scale        = 1.5;
+let scale        = 1.5;   // PDF render quality (fixed)
+let viewZoom     = 1;     // visual CSS zoom
 let pendingDrop  = null;
+let vendors      = [];
+let buildingLat  = null;
+let buildingLng  = null;
 let draggingNode = null;
+let panMode      = false;
+let panning      = null;
+let spaceHeld    = false;
 let ctxTarget    = null;
 let modalTarget  = null;
 let moveDebounce = null;
@@ -511,7 +531,9 @@ async function init() {
     const info = await fetch(`/api/floors/${floorId}`).then(r => r.json());
     document.getElementById('floor-label').textContent =
       `${info.client_name}  ›  ${info.city_name}  ›  ${info.building_name}  ›  ${info.label}`;
-    document.title = `${info.label} — Floor Planner`;
+    document.title = `${info.label} — PrintMap`;
+    buildingLat = info.building_lat ?? null;
+    buildingLng = info.building_lng ?? null;
   } catch { /* non-fatal */ }
 }
 
@@ -561,11 +583,53 @@ function afterRender() {
 
 // ── Zoom ──────────────────────────────────────────────────────────────────────
 
-zoomSlider.addEventListener('input', () => {
-  scale = parseFloat(zoomSlider.value);
-  zoomLabel.textContent = scale + '×';
-  if (pdfDoc) renderPdf();
-});
+function applyZoom(newZoom) {
+  viewZoom = Math.min(3, Math.max(0.25, Math.round(newZoom * 4) / 4));
+  zoomSlider.value = viewZoom;
+  zoomLabel.textContent = viewZoom + '×';
+  planContainer.style.zoom = viewZoom;
+}
+
+zoomSlider.addEventListener('input', () => applyZoom(parseFloat(zoomSlider.value)));
+document.getElementById('zoom-out-btn').addEventListener('click', () => applyZoom(viewZoom - 0.25));
+document.getElementById('zoom-in-btn').addEventListener('click',  () => applyZoom(viewZoom + 0.25));
+
+// ── Haversine distance (km) ───────────────────────────────────────────────────
+
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371, toR = Math.PI / 180;
+  const dLat = (lat2 - lat1) * toR, dLng = (lng2 - lng1) * toR;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*toR) * Math.cos(lat2*toR) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function populateVendorSelect(selectedId) {
+  const sel = document.getElementById('modal-vendor');
+  sel.innerHTML = '<option value="">— None —</option>';
+  vendors.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v.id;
+    opt.textContent = `${v.name} (${v.type === 'GO' ? 'GO Branch' : 'B2B'} · ${v.city})`;
+    if (v.id === selectedId) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  updateVendorDistance();
+}
+
+function updateVendorDistance() {
+  const distEl = document.getElementById('modal-vendor-distance');
+  const vid = parseInt(document.getElementById('modal-vendor').value);
+  const v = vendors.find(x => x.id === vid);
+  if (v && v.lat != null && v.lng != null && buildingLat != null && buildingLng != null) {
+    const km = haversineKm(buildingLat, buildingLng, v.lat, v.lng);
+    distEl.textContent = `📍 ${Math.round(km)} km from this building`;
+    distEl.style.display = '';
+  } else {
+    distEl.style.display = 'none';
+  }
+}
+
+document.getElementById('modal-vendor').addEventListener('change', updateVendorDistance);
 
 prevBtn.addEventListener('click', async () => { if (pageNum > 1) { pageNum--; await renderPdf(); } });
 nextBtn.addEventListener('click', async () => {
@@ -615,8 +679,8 @@ canvasArea.addEventListener('drop', async e => {
 
   if (!pendingDrop || !floorCanvas.width) return;
   const rect = floorCanvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
+  const x = (e.clientX - rect.left) / viewZoom;
+  const y = (e.clientY - rect.top) / viewZoom;
   if (x < 0 || y < 0 || x > floorCanvas.width || y > floorCanvas.height) return;
 
   counters[pendingDrop.type] = (counters[pendingDrop.type] || 0) + 1;
@@ -705,19 +769,19 @@ function createDeviceNode(x, y, type, icon, label, id, extra) {
 // ── Dragging placed nodes ─────────────────────────────────────────────────────
 
 function onNodeMouseDown(e, el, data) {
-  if (e.button !== 0) return;
+  if (e.button !== 0 || panMode) return; // in pan mode let event bubble to canvas-area
   e.stopPropagation();
   e.preventDefault();
   const rect = floorCanvas.getBoundingClientRect();
-  draggingNode = { el, data, ox: e.clientX - rect.left - data.x, oy: e.clientY - rect.top - data.y };
+  draggingNode = { el, data, ox: (e.clientX - rect.left) / viewZoom - data.x, oy: (e.clientY - rect.top) / viewZoom - data.y };
   el.style.zIndex = 50;
 }
 
 document.addEventListener('mousemove', e => {
   if (!draggingNode) return;
   const rect = floorCanvas.getBoundingClientRect();
-  let x = Math.max(0, Math.min(floorCanvas.width,  e.clientX - rect.left - draggingNode.ox));
-  let y = Math.max(0, Math.min(floorCanvas.height, e.clientY - rect.top  - draggingNode.oy));
+  let x = Math.max(0, Math.min(floorCanvas.width,  (e.clientX - rect.left) / viewZoom - draggingNode.ox));
+  let y = Math.max(0, Math.min(floorCanvas.height, (e.clientY - rect.top)  / viewZoom - draggingNode.oy));
   draggingNode.data.x = x;
   draggingNode.data.y = y;
   draggingNode.data.x_pct = floorCanvas.width  ? x / floorCanvas.width  : 0;
@@ -737,6 +801,61 @@ document.addEventListener('mouseup', () => {
   moveDebounce = setTimeout(() => {
     if (!data.id.startsWith('temp-')) syncDevice(data);
   }, 400);
+});
+
+// ── Hand / pan tool ──────────────────────────────────────────────────────────
+
+function setPanMode(on) {
+  panMode = on;
+  canvasArea.classList.toggle('pan-mode', on);
+  document.getElementById('hand-tool-btn').classList.toggle('active', on);
+}
+
+document.getElementById('hand-tool-btn').addEventListener('click', () => setPanMode(!panMode));
+
+canvasArea.addEventListener('mousedown', e => {
+  if (!panMode || e.button !== 0) return;
+  e.preventDefault();
+  panning = { startX: e.clientX, startY: e.clientY, scrollLeft: canvasArea.scrollLeft, scrollTop: canvasArea.scrollTop };
+  canvasArea.classList.add('panning');
+});
+
+document.addEventListener('mousemove', e => {
+  if (!panning) return;
+  canvasArea.scrollLeft = panning.scrollLeft - (e.clientX - panning.startX);
+  canvasArea.scrollTop  = panning.scrollTop  - (e.clientY - panning.startY);
+});
+
+document.addEventListener('mouseup', () => {
+  if (!panning) return;
+  panning = null;
+  canvasArea.classList.remove('panning');
+});
+
+// Spacebar = temporary pan; +/=/- /0 = zoom
+document.addEventListener('keydown', e => {
+  if (e.target.matches('input,textarea,select')) return;
+  if (e.key === ' ' && !spaceHeld) {
+    e.preventDefault();
+    spaceHeld = true;
+    if (!panMode) { spaceHeld = 'temp'; setPanMode(true); }
+  }
+  if (!e.ctrlKey && !e.metaKey) {
+    if (e.key === '+' || e.key === '=') { e.preventDefault(); applyZoom(viewZoom + 0.25); }
+    if (e.key === '-')                  { e.preventDefault(); applyZoom(viewZoom - 0.25); }
+    if (e.key === '0')                  { e.preventDefault(); applyZoom(1); }
+    const step = 80;
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); canvasArea.scrollLeft -= step; }
+    if (e.key === 'ArrowRight') { e.preventDefault(); canvasArea.scrollLeft += step; }
+    if (e.key === 'ArrowUp')    { e.preventDefault(); canvasArea.scrollTop  -= step; }
+    if (e.key === 'ArrowDown')  { e.preventDefault(); canvasArea.scrollTop  += step; }
+  }
+});
+document.addEventListener('keyup', e => {
+  if (e.key === ' ') {
+    if (spaceHeld === 'temp') setPanMode(false);
+    spaceHeld = false;
+  }
 });
 
 // ── Context menu ──────────────────────────────────────────────────────────────
@@ -931,6 +1050,7 @@ function openEditModal(data, el) {
   modalNotes.value     = data.notes        || '';
   populateBrandSelect(data.brand || '');
   populateModelSelect(data.brand || '', data.model || '');
+  populateVendorSelect(data.vendor_id || null);
   editBackdrop.classList.add('open');
   modalLabel.focus();
   modalLabel.select();
@@ -961,6 +1081,7 @@ document.getElementById('modal-save').addEventListener('click', async () => {
   data.rental_amount = parseFloat(document.getElementById('modal-rental-amount').value) || null;
   data.rental_period = document.getElementById('modal-rental-period').value || null;
   data.notes         = modalNotes.value.trim();
+  data.vendor_id     = parseInt(document.getElementById('modal-vendor').value) || null;
   el.querySelector('.d-label').textContent = data.label;
   refreshVolLabel(el, data);
   closeEditModal();
@@ -993,6 +1114,7 @@ function syncDevice(data) {
     avg_mono:       data.avg_mono,       avg_colour:     data.avg_colour,
     mono_rate:      data.mono_rate,      colour_rate:    data.colour_rate,
     rental_amount:  data.rental_amount,  rental_period:  data.rental_period,
+    vendor_id:      data.vendor_id,
     x_pct:          data.x_pct,         y_pct:          data.y_pct,
   });
 }
@@ -1102,6 +1224,7 @@ document.getElementById('export-list-btn').addEventListener('click', () => {
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 loadCatalogue();
+fetch('/api/vendors').then(r => r.json()).then(d => { vendors = d; }).catch(() => {});
 init();
 </script>
 </body>

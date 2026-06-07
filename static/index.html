@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Asset Planner</title>
+  <title>PrintMap</title>
   <script src="theme.js"></script>
   <script src="date-utils.js"></script>
   <link rel="stylesheet" href="style.css">
@@ -268,8 +268,8 @@
 <body>
 
 <header>
-  <h1>📋 Asset Planner</h1>
-  <span class="subtitle">Device Management Dashboard</span>
+  <h1>PrintMap</h1>
+  <span class="subtitle">Client &amp; Location Manager</span>
   <div style="margin-left:auto; display:flex; gap:8px;">
     <a id="reports-link" href="/reports" class="btn btn-neutral" style="text-decoration:none">📊 Reports</a>
     <a id="tco-link" href="/tco" class="btn btn-neutral" style="text-decoration:none">💰 TCO Calculator</a>
@@ -558,7 +558,9 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
   subdomains: 'abcd', maxZoom: 19,
 }).addTo(map);
-const markersLayer = L.layerGroup().addTo(map);
+const markersLayer  = L.layerGroup().addTo(map);
+const vendorLayer   = L.layerGroup().addTo(map);
+let   allVendors    = [];
 
 // ── API ───────────────────────────────────────────────────────────────────────
 
@@ -924,8 +926,8 @@ function renderMap() {
 
       const marker = L.circleMarker([lat, lng], {
         radius: 8,
-        fillColor: '#22c55e',
-        color: '#15803d',
+        fillColor: '#3b82f6',
+        color: '#1d4ed8',
         weight: 2,
         opacity: 1,
         fillOpacity: 0.85,
@@ -959,6 +961,44 @@ function renderMap() {
     emptyEl.classList.add('hidden');
     map.fitBounds(markers, { padding: [80, 80], maxZoom: 14 });
   }
+}
+
+// ── Vendor pins ───────────────────────────────────────────────────────────────
+
+async function loadAndPlotVendors() {
+  try { allVendors = await fetch('/api/vendors').then(r => r.json()); } catch { allVendors = []; }
+  vendorLayer.clearLayers();
+  allVendors.forEach(v => {
+    if (v.lat == null || v.lng == null) return;
+    const isGO    = v.type === 'GO';
+    const fill    = isGO ? '#22c55e' : '#f97316';
+    const stroke  = isGO ? '#15803d' : '#c2410c';
+    const label   = isGO ? 'GO Branch' : 'B2B';
+
+    const marker = L.circleMarker([v.lat, v.lng], {
+      radius: 9, fillColor: fill, color: stroke,
+      weight: 2, opacity: 1, fillOpacity: 0.9,
+    });
+
+    const contact = (name, phone) => name
+      ? `<div style="margin-top:4px;"><span style="color:var(--muted);font-size:11px;">${name}</span>${phone ? `<br><span style="color:var(--accent-h);font-size:11px;">${phone}</span>` : ''}</div>`
+      : '';
+
+    marker.bindPopup(`
+      <strong>${v.name}</strong>
+      <div class="pop-meta" style="margin-bottom:6px;">
+        <span style="background:${isGO ? '#14291e' : '#2d1f0a'};color:${fill};padding:1px 7px;border-radius:8px;font-size:11px;">${label}</span>
+        ${v.city ? ` · ${v.city}` : ''}
+      </div>
+      <div style="font-size:12px;line-height:1.7;">
+        ${v.admin_name ? `<b style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.06em;">Admin</b>${contact(v.admin_name, v.admin_phone)}` : ''}
+        ${v.tech_manager_name ? `<b style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.06em;">Tech Manager</b>${contact(v.tech_manager_name, v.tech_manager_phone)}` : ''}
+        ${v.service_controller_name ? `<b style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.06em;">Service Controller</b>${contact(v.service_controller_name, v.service_controller_phone)}` : ''}
+      </div>
+    `);
+
+    vendorLayer.addLayer(marker);
+  });
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -1620,6 +1660,7 @@ loadClients().then(() => {
   if (returnClient) selectClientById(returnClient);
 });
 loadDeviceCatalogue();
+loadAndPlotVendors();
 buildDateInput(document.getElementById('dm-contract-start'));
 </script>
 </body>

@@ -2,9 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Admin — Asset Planner</title>
+  <title>Admin — PrintMap</title>
   <script src="theme.js"></script>
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <style>
     body { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
     header {
@@ -38,14 +39,20 @@
       border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden;
     }
     #catalogue-header {
-      padding: 12px 16px; border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 12px 10px 16px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px; flex-shrink: 0;
     }
-    #add-brand-bar {
-      padding: 8px 12px; border-bottom: 1px solid var(--border);
-      display: flex; gap: 6px; flex-shrink: 0;
+    #catalogue-header .section-label { flex: 1; }
+    #catalogue-searchbar {
+      padding: 8px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0;
     }
-    #add-brand-bar .input { flex: 1; font-size: 12px; padding: 5px 8px; }
+    #catalogue-searchbar .input { width: 100%; box-sizing: border-box; font-size: 12px; padding: 6px 10px; }
+    #add-brand-row {
+      padding: 6px 12px 8px; border-bottom: 1px solid var(--border);
+      display: none; gap: 6px; align-items: center; flex-shrink: 0;
+    }
+    #add-brand-row.open { display: flex; }
+    #add-brand-row .input { flex: 1; font-size: 12px; padding: 5px 8px; }
     #catalogue-scroll { flex: 1; overflow-y: auto; padding: 8px 0; }
 
     .brand-block { border-bottom: 1px solid var(--border); }
@@ -77,6 +84,7 @@
     .badge-size { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 10px; white-space: nowrap; }
     .badge-size.a3 { background: rgba(251,146,60,0.2); color: #fb923c; }
     .badge-size.a4 { background: rgba(107,114,128,0.15); color: var(--muted); }
+    .badge-speed { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 10px; white-space: nowrap; background: rgba(16,185,129,0.15); color: #34d399; }
 
     .model-rate { font-size: 11px; color: var(--muted); white-space: nowrap; }
     .model-del { opacity: 0; transition: opacity 0.15s; flex-shrink: 0; }
@@ -132,12 +140,7 @@
     #colour-rate-field { transition: opacity 0.2s; }
     #colour-rate-field.dimmed { opacity: 0.35; pointer-events: none; }
 
-    .add-brand-card {
-      background: var(--surface); border: 1px solid var(--border2); border-radius: 10px;
-      padding: 20px; max-width: 380px; margin-bottom: 24px;
-    }
-    .add-brand-card label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 6px; }
-    .add-brand-row { display: flex; gap: 8px; }
+    .no-results { padding: 24px 16px; text-align: center; font-size: 13px; color: var(--muted2); }
 
     /* ── Import / Rates panes ── */
     #import-pane, #rates-pane { flex-direction: column; padding: 28px 32px; overflow-y: auto; }
@@ -184,6 +187,79 @@
     .pool-table .rate-cell { text-align: right; font-variant-numeric: tabular-nums; color: var(--accent-h); font-weight: 600; }
     .pool-table .rate-cell.empty { color: var(--muted2); font-weight: 400; }
     .pool-empty { padding: 20px 0; font-size: 13px; color: var(--muted2); line-height: 1.7; max-width: 360px; }
+
+    /* ── Compare pane ── */
+    #compare-pane { flex-direction: column; overflow-y: auto; padding: 24px 28px; gap: 20px; }
+    .cmp-models-row { display: grid; grid-template-columns: 1fr 40px 1fr; gap: 0; align-items: start; max-width: 900px; }
+    .cmp-vs { display: flex; align-items: center; justify-content: center; padding-top: 36px;
+              font-size: 13px; font-weight: 700; color: var(--muted); }
+    .cmp-card { background: var(--surface); border: 1px solid var(--border2); border-radius: 10px; padding: 16px; }
+    .cmp-card-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+                      margin-bottom: 8px; }
+    .cmp-card-label.a { color: #60a5fa; }
+    .cmp-card-label.b { color: #34d399; }
+    .cmp-search-wrap { position: relative; margin-bottom: 10px; }
+    .cmp-search-input { width: 100%; box-sizing: border-box; font-size: 13px; }
+    .cmp-dropdown {
+      display: none; position: absolute; top: calc(100% + 3px); left: 0; right: 0; z-index: 200;
+      background: var(--surface2); border: 1px solid var(--border2); border-radius: 8px;
+      max-height: 240px; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    }
+    .cmp-dropdown.open { display: block; }
+    .cmp-dropdown-group { padding: 4px 0; border-bottom: 1px solid var(--border); }
+    .cmp-dropdown-group:last-child { border-bottom: none; }
+    .cmp-dropdown-brand { padding: 5px 12px 2px; font-size: 10px; font-weight: 700;
+                          text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted2); }
+    .cmp-dropdown-item { padding: 7px 12px; font-size: 13px; cursor: pointer; display: flex;
+                         align-items: center; gap: 6px; color: var(--text); }
+    .cmp-dropdown-item:hover { background: var(--accent-h); color: #fff; }
+    .cmp-dropdown-item:hover .badge-type,
+    .cmp-dropdown-item:hover .badge-size,
+    .cmp-dropdown-item:hover .badge-speed { opacity: 0.8; }
+    .cmp-dropdown-empty { padding: 12px; font-size: 13px; color: var(--muted2); text-align: center; }
+    .cmp-badges { display: flex; gap: 5px; margin-bottom: 12px; min-height: 22px; flex-wrap: wrap; }
+    .cmp-fields { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .cmp-field label { display: block; font-size: 10px; text-transform: uppercase;
+                       letter-spacing: 0.07em; color: var(--muted); margin-bottom: 4px; }
+    .cmp-field input { width: 100%; box-sizing: border-box; }
+    .cmp-field input.no-colour { opacity: 0.35; pointer-events: none; }
+
+    .cmp-scenario { background: var(--surface); border: 1px solid var(--border2); border-radius: 10px;
+                    padding: 16px 20px; max-width: 900px; }
+    .cmp-scenario h3 { font-size: 10px; font-weight: 700; text-transform: uppercase;
+                       letter-spacing: 0.1em; color: var(--muted); margin-bottom: 14px; }
+    .cmp-sliders { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .cmp-slider-row label { display: block; font-size: 12px; color: var(--text); margin-bottom: 6px; }
+    .cmp-slider-row input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+    .cmp-slider-val { font-size: 12px; font-weight: 600; color: var(--accent); float: right; }
+
+    .cmp-result { background: var(--surface); border: 1px solid var(--border2); border-radius: 10px;
+                  padding: 16px 20px; max-width: 900px; }
+    .cmp-result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px; }
+    .cmp-cost-card { border-radius: 8px; padding: 14px 16px; }
+    .cmp-cost-card.a { background: rgba(96,165,250,0.08); border: 1px solid rgba(96,165,250,0.2); }
+    .cmp-cost-card.b { background: rgba(52,211,153,0.08); border: 1px solid rgba(52,211,153,0.2); }
+    .cmp-cost-card.winner { border-width: 2px; }
+    .cmp-cost-model { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+    .cmp-cost-amount { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .cmp-cost-card.a .cmp-cost-amount { color: #60a5fa; }
+    .cmp-cost-card.b .cmp-cost-amount { color: #34d399; }
+    .cmp-cost-detail { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .cmp-crossover { font-size: 13px; color: var(--text); padding: 10px 14px;
+                     background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.2);
+                     border-radius: 8px; line-height: 1.6; }
+    .cmp-crossover strong { color: #fbbf24; }
+    .cmp-winner-tag { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px;
+                      border-radius: 10px; margin-left: 6px; vertical-align: middle; }
+    .cmp-winner-tag.a { background: rgba(96,165,250,0.2); color: #60a5fa; }
+    .cmp-winner-tag.b { background: rgba(52,211,153,0.2); color: #34d399; }
+
+    .cmp-chart-wrap { background: var(--surface); border: 1px solid var(--border2); border-radius: 10px;
+                      padding: 20px; max-width: 900px; position: relative; }
+    .cmp-chart-wrap h3 { font-size: 10px; font-weight: 700; text-transform: uppercase;
+                         letter-spacing: 0.1em; color: var(--muted); margin-bottom: 14px; }
+    #cmp-chart { max-height: 320px; }
+    .cmp-empty { padding: 40px; text-align: center; color: var(--muted2); font-size: 13px; }
   </style>
 </head>
 <body>
@@ -197,8 +273,10 @@
 
 <div id="top-tabs">
   <div class="ttab active" id="tab-catalogue" onclick="switchTab('catalogue')">Catalogue</div>
+  <div class="ttab" id="tab-compare"   onclick="switchTab('compare')">Compare</div>
   <div class="ttab" id="tab-import"    onclick="switchTab('import')">Fleet Import</div>
   <div class="ttab" id="tab-rates"     onclick="switchTab('rates')">Rates</div>
+  <div class="ttab" id="tab-vendors"   onclick="switchTab('vendors')">Service Agents</div>
 </div>
 
 <!-- ── Catalogue pane ── -->
@@ -209,10 +287,15 @@
     <div id="catalogue-header">
       <span class="section-label">Brands &amp; Models</span>
       <span id="catalogue-count" style="font-size:11px; color:var(--muted)"></span>
-    </div>
-    <div id="add-brand-bar">
-      <input id="new-brand-input" class="input" type="text" placeholder="New brand name…">
       <button class="btn btn-primary btn-sm" id="add-brand-btn">+ Add Brand</button>
+    </div>
+    <div id="catalogue-searchbar">
+      <input id="catalogue-search" class="input" type="text" placeholder="Search brands and models…" autocomplete="off">
+    </div>
+    <div id="add-brand-row">
+      <input id="new-brand-input" class="input" type="text" placeholder="Brand name, e.g. HP">
+      <button class="btn btn-primary btn-sm" id="confirm-add-brand">Add</button>
+      <button class="btn btn-neutral btn-sm" id="cancel-add-brand">Cancel</button>
     </div>
     <div id="catalogue-scroll">
       <div id="catalogue-root"></div>
@@ -272,6 +355,10 @@
               <label for="ps-a3">A3</label>
             </div>
           </div>
+          <div class="modal-field">
+            <label>Speed (ppm)</label>
+            <input id="ed-speed-ppm" class="input" type="number" min="1" max="200" step="1" placeholder="e.g. 30" style="max-width:140px;">
+          </div>
         </div>
       </div>
 
@@ -314,7 +401,7 @@
     </div>
 
     <!-- Default: optimisation pool -->
-    <div id="add-brand-section">
+    <div id="opt-pool-view">
       <h2>Optimisation Pool</h2>
       <div id="opt-pool-section"></div>
     </div>
@@ -340,6 +427,98 @@
   </div>
 </div>
 
+<!-- ── Compare pane ── -->
+<div id="compare-pane" class="tab-pane">
+
+  <!-- Model selectors -->
+  <div class="cmp-models-row">
+    <div class="cmp-card">
+      <div class="cmp-card-label a">Model A</div>
+      <div class="cmp-search-wrap">
+        <input id="cmp-search-a" class="input cmp-search-input" type="text" placeholder="Search models…" autocomplete="off">
+        <div id="cmp-dropdown-a" class="cmp-dropdown"></div>
+      </div>
+      <div class="cmp-badges" id="cmp-badges-a"></div>
+      <div class="cmp-fields">
+        <div class="cmp-field">
+          <label>Rental (R/mo)</label>
+          <input id="cmp-rental-a" class="input" type="number" min="0" step="0.01" placeholder="0">
+        </div>
+        <div class="cmp-field">
+          <label>Mono CPC (R)</label>
+          <input id="cmp-mono-rate-a" class="input" type="number" min="0" step="0.0001" placeholder="0.0000">
+        </div>
+        <div class="cmp-field">
+          <label>Colour CPC (R)</label>
+          <input id="cmp-colour-rate-a" class="input" type="number" min="0" step="0.0001" placeholder="0.0000">
+        </div>
+      </div>
+    </div>
+    <div class="cmp-vs">vs</div>
+    <div class="cmp-card">
+      <div class="cmp-card-label b">Model B</div>
+      <div class="cmp-search-wrap">
+        <input id="cmp-search-b" class="input cmp-search-input" type="text" placeholder="Search models…" autocomplete="off">
+        <div id="cmp-dropdown-b" class="cmp-dropdown"></div>
+      </div>
+      <div class="cmp-badges" id="cmp-badges-b"></div>
+      <div class="cmp-fields">
+        <div class="cmp-field">
+          <label>Rental (R/mo)</label>
+          <input id="cmp-rental-b" class="input" type="number" min="0" step="0.01" placeholder="0">
+        </div>
+        <div class="cmp-field">
+          <label>Mono CPC (R)</label>
+          <input id="cmp-mono-rate-b" class="input" type="number" min="0" step="0.0001" placeholder="0.0000">
+        </div>
+        <div class="cmp-field">
+          <label>Colour CPC (R)</label>
+          <input id="cmp-colour-rate-b" class="input" type="number" min="0" step="0.0001" placeholder="0.0000">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Volume scenario -->
+  <div class="cmp-scenario">
+    <h3>Monthly Volume Scenario</h3>
+    <div class="cmp-sliders">
+      <div class="cmp-slider-row">
+        <label>Mono pages/month <span class="cmp-slider-val" id="cmp-mono-vol-val">5,000</span></label>
+        <input type="range" id="cmp-mono-vol" min="0" max="50000" step="500" value="5000">
+      </div>
+      <div class="cmp-slider-row">
+        <label>Colour pages/month <span class="cmp-slider-val" id="cmp-colour-vol-val">500</span></label>
+        <input type="range" id="cmp-colour-vol" min="0" max="20000" step="100" value="500">
+      </div>
+    </div>
+  </div>
+
+  <!-- Results + crossover -->
+  <div class="cmp-result" id="cmp-result" style="display:none">
+    <div class="cmp-result-grid">
+      <div class="cmp-cost-card a" id="cmp-cost-a">
+        <div class="cmp-cost-model" id="cmp-name-a">Model A</div>
+        <div class="cmp-cost-amount" id="cmp-total-a">R 0</div>
+        <div class="cmp-cost-detail" id="cmp-detail-a"></div>
+      </div>
+      <div class="cmp-cost-card b" id="cmp-cost-b">
+        <div class="cmp-cost-model" id="cmp-name-b">Model B</div>
+        <div class="cmp-cost-amount" id="cmp-total-b">R 0</div>
+        <div class="cmp-cost-detail" id="cmp-detail-b"></div>
+      </div>
+    </div>
+    <div class="cmp-crossover" id="cmp-crossover"></div>
+  </div>
+
+  <!-- Chart -->
+  <div class="cmp-chart-wrap" id="cmp-chart-wrap" style="display:none">
+    <h3>Monthly Cost vs. Volume</h3>
+    <canvas id="cmp-chart"></canvas>
+  </div>
+
+</div>
+
 <!-- ── Rates pane ── -->
 <div id="rates-pane" class="tab-pane">
   <h2>Rates &amp; Pricing</h2>
@@ -348,6 +527,114 @@
       Standard CPC rates, dealer rates, and distance surcharges will be managed here.<br>
       This section is a placeholder — pricing tools coming soon.
     </p>
+  </div>
+</div>
+
+<!-- ── Service Agents pane ── -->
+<div id="vendors-pane" class="tab-pane" style="flex-direction:column; overflow:hidden;">
+  <div style="padding:16px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; flex-shrink:0;">
+    <span class="section-label" style="font-size:13px;">Service Agents</span>
+    <span id="vendor-count" style="font-size:11px; color:var(--muted)"></span>
+    <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="openVendorModal(null)">+ Add Agent</button>
+  </div>
+  <div style="flex:1; overflow-y:auto; padding:16px 20px;">
+    <table id="vendor-table" style="width:100%; border-collapse:collapse; font-size:13px;">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:0.06em;">
+          <th style="text-align:left; padding:6px 8px;">Name</th>
+          <th style="text-align:left; padding:6px 8px;">Type</th>
+          <th style="text-align:left; padding:6px 8px;">City</th>
+          <th style="text-align:left; padding:6px 8px;">Admin</th>
+          <th style="text-align:left; padding:6px 8px;">Tech Manager</th>
+          <th style="text-align:left; padding:6px 8px;">Service Controller</th>
+          <th style="padding:6px 8px;"></th>
+        </tr>
+      </thead>
+      <tbody id="vendor-tbody"></tbody>
+    </table>
+    <div id="vendor-empty" style="display:none; text-align:center; padding:48px; color:var(--muted2); font-size:13px;">No service agents yet. Click + Add Agent to get started.</div>
+  </div>
+</div>
+
+<!-- Vendor modal -->
+<div class="modal-backdrop" id="vendor-modal">
+  <div class="modal" style="width:480px;">
+    <h2 id="vendor-modal-title">Add Service Agent</h2>
+
+    <div style="display:flex; gap:10px; margin-bottom:14px;">
+      <div style="flex:2;">
+        <label class="modal-field"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:block;margin-bottom:5px;">Name</span>
+          <input id="v-name" class="input" type="text" placeholder="e.g. GO Durban Branch">
+        </label>
+      </div>
+      <div style="flex:1;">
+        <label class="modal-field"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:block;margin-bottom:5px;">Type</span>
+          <select id="v-type" class="input" style="appearance:none;cursor:pointer;">
+            <option value="GO">GO Branch</option>
+            <option value="B2B">B2B / 3rd Party</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:10px; margin-bottom:14px;">
+      <div style="flex:2;">
+        <label class="modal-field"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:block;margin-bottom:5px;">City</span>
+          <input id="v-city" class="input" type="text" placeholder="e.g. Durban">
+        </label>
+      </div>
+      <div style="flex:1;">
+        <label class="modal-field"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:block;margin-bottom:5px;">Latitude</span>
+          <input id="v-lat" class="input" type="number" step="any" placeholder="-29.858">
+        </label>
+      </div>
+      <div style="flex:1;">
+        <label class="modal-field"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:block;margin-bottom:5px;">Longitude</span>
+          <input id="v-lng" class="input" type="number" step="any" placeholder="31.021">
+        </label>
+      </div>
+    </div>
+
+    <div style="border-top:1px solid var(--border); margin:12px 0;"></div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px;">
+      <div>
+        <label class="modal-field"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:block;margin-bottom:5px;">Admin Name</span>
+          <input id="v-admin-name" class="input" type="text" placeholder="Full name">
+        </label>
+      </div>
+      <div>
+        <label class="modal-field"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:block;margin-bottom:5px;">Admin Phone</span>
+          <input id="v-admin-phone" class="input" type="text" placeholder="+27 31 000 0000">
+        </label>
+      </div>
+      <div>
+        <label class="modal-field"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:block;margin-bottom:5px;">Tech Manager Name</span>
+          <input id="v-tm-name" class="input" type="text" placeholder="Full name">
+        </label>
+      </div>
+      <div>
+        <label class="modal-field"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:block;margin-bottom:5px;">Tech Manager Phone</span>
+          <input id="v-tm-phone" class="input" type="text" placeholder="+27 31 000 0000">
+        </label>
+      </div>
+      <div>
+        <label class="modal-field"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:block;margin-bottom:5px;">Service Controller Name</span>
+          <input id="v-sc-name" class="input" type="text" placeholder="Full name">
+        </label>
+      </div>
+      <div>
+        <label class="modal-field"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:block;margin-bottom:5px;">Service Controller Phone</span>
+          <input id="v-sc-phone" class="input" type="text" placeholder="+27 31 000 0000">
+        </label>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-neutral" onclick="closeVendorModal()">Cancel</button>
+      <button class="btn btn-danger btn-sm" id="v-delete-btn" style="margin-right:auto; display:none;" onclick="deleteVendor()">Delete</button>
+      <button class="btn btn-primary" onclick="saveVendor()">Save</button>
+    </div>
   </div>
 </div>
 
@@ -363,10 +650,11 @@ let activeTab = 'catalogue';
 
 function switchTab(tab) {
   activeTab = tab;
-  ['catalogue', 'import', 'rates'].forEach(t => {
+  ['catalogue', 'compare', 'import', 'rates', 'vendors'].forEach(t => {
     document.getElementById('tab-' + t).classList.toggle('active', tab === t);
     document.getElementById(t + '-pane').classList.toggle('active', tab === t);
   });
+  if (tab === 'vendors') loadVendors();
 }
 
 async function api(method, path, body) {
@@ -425,11 +713,13 @@ function renderOptimiserPool() {
                     ? 'R ' + parseFloat(m.colour_rate).toFixed(4)   : null;
     const rentalR = m.rental_amount != null
                     ? 'R ' + parseFloat(m.rental_amount).toFixed(2) : null;
+    const speedLabel = m.speed_ppm ? m.speed_ppm + 'ppm' : '—';
     return `<tr>
       <td>${esc(m.brand_name)}</td>
       <td>${esc(m.name)}</td>
       <td><span class="badge-type ${ct}">${ct === 'colour' ? 'Colour' : 'Mono'}</span></td>
       <td><span class="badge-size ${ps.toLowerCase()}">${ps}</span></td>
+      <td><span class="badge-speed">${speedLabel}</span></td>
       <td class="rate-cell${monoR ? '' : ' empty'}">${monoR || '—'}</td>
       <td class="rate-cell${colourR ? '' : ' empty'}">${colourR || '—'}</td>
       <td class="rate-cell${rentalR ? '' : ' empty'}">${rentalR || '—'}</td>
@@ -440,7 +730,7 @@ function renderOptimiserPool() {
     <table class="pool-table">
       <thead>
         <tr>
-          <th>Brand</th><th>Model</th><th>Type</th><th>Size</th>
+          <th>Brand</th><th>Model</th><th>Type</th><th>Size</th><th>Speed</th>
           <th style="text-align:right">Mono CPC</th>
           <th style="text-align:right">Colour CPC</th>
           <th style="text-align:right">Rental/mo</th>
@@ -456,15 +746,38 @@ function render() {
   root.innerHTML = '';
 
   if (!catalogue.length) {
-    root.innerHTML = '<div class="empty-catalogue"><span class="big">🗂</span>No brands yet.<br>Add one using the form on the right.</div>';
+    root.innerHTML = '<div class="empty-catalogue"><span class="big">🗂</span>No brands yet.<br>Click "+ Add Brand" to get started.</div>';
     count.textContent = '';
     return;
+  }
+
+  const q = (document.getElementById('catalogue-search')?.value || '').toLowerCase().trim();
+  let visibleBrands;
+  if (!q) {
+    visibleBrands = catalogue.map(b => ({ brand: b, models: b.models, expand: false }));
+  } else {
+    visibleBrands = catalogue.map(b => {
+      const brandMatch = b.name.toLowerCase().includes(q);
+      const matchingModels = b.models.filter(m =>
+        m.name.toLowerCase().includes(q) ||
+        (m.colour_type || '').toLowerCase().includes(q) ||
+        (m.page_size   || '').toLowerCase().includes(q) ||
+        (m.speed_ppm != null && String(m.speed_ppm).includes(q))
+      );
+      if (!brandMatch && matchingModels.length === 0) return null;
+      return { brand: b, models: brandMatch ? b.models : matchingModels, expand: true };
+    }).filter(Boolean);
+    if (!visibleBrands.length) {
+      root.innerHTML = `<div class="no-results">No results for "<strong>${esc(q)}</strong>"</div>`;
+      count.textContent = '';
+      return;
+    }
   }
 
   const totalModels = catalogue.reduce((s, b) => s + b.models.length, 0);
   count.textContent = `${catalogue.length} brand${catalogue.length !== 1 ? 's' : ''} · ${totalModels} models`;
 
-  catalogue.forEach(brand => {
+  visibleBrands.forEach(({ brand, models: shownModels, expand }) => {
     const block = document.createElement('div');
     block.className = 'brand-block';
 
@@ -523,8 +836,9 @@ function render() {
 
     const modelList = document.createElement('div');
     modelList.className = 'model-list';
+    if (expand) { modelList.classList.add('open'); toggle.classList.add('open'); }
 
-    brand.models.forEach(model => {
+    shownModels.forEach(model => {
       const mRow = document.createElement('div');
       mRow.className = 'model-row' + (selectedModel?.model.id === model.id ? ' selected' : '');
       mRow.title = 'Click to edit pricing and classification';
@@ -543,12 +857,12 @@ function render() {
       sizeBadge.className = `badge-size ${ps.toLowerCase()}`;
       sizeBadge.textContent = ps;
 
+      const speedBadge = document.createElement('span');
+      speedBadge.className = 'badge-speed';
+      speedBadge.textContent = model.speed_ppm ? model.speed_ppm + 'ppm' : '—';
+
       const rateEl = document.createElement('span');
       rateEl.className = 'model-rate';
-      const parts = [];
-      if (model.mono_rate)   parts.push(`M: R${parseFloat(model.mono_rate).toFixed(4)}`);
-      if (model.colour_rate) parts.push(`C: R${parseFloat(model.colour_rate).toFixed(4)}`);
-      rateEl.textContent = parts.join(' · ');
 
       const mDel = document.createElement('button');
       mDel.className = 'btn btn-danger btn-sm model-del';
@@ -572,7 +886,7 @@ function render() {
         const newVal = !model.optimiser_allowed;
         await api('PUT', `/models/${model.id}`, {
           name: model.name, colour_type: model.colour_type, page_size: model.page_size,
-          mono_rate: model.mono_rate, colour_rate: model.colour_rate,
+          speed_ppm: model.speed_ppm, mono_rate: model.mono_rate, colour_rate: model.colour_rate,
           rental_amount: model.rental_amount, optimiser_allowed: newVal,
         });
         model.optimiser_allowed = newVal;
@@ -586,6 +900,7 @@ function render() {
       mRow.appendChild(mName);
       mRow.appendChild(typeBadge);
       mRow.appendChild(sizeBadge);
+      mRow.appendChild(speedBadge);
       mRow.appendChild(rateEl);
       mRow.appendChild(optEl);
       mRow.appendChild(mDel);
@@ -645,7 +960,7 @@ function toggleEdSection(id) {
 function openEditor(model, brand) {
   selectedModel = { model, brand };
   document.getElementById('model-editor').style.display = 'block';
-  document.getElementById('add-brand-section').style.display = 'none';
+  document.getElementById('opt-pool-view').style.display = 'none';
   document.getElementById('editor-title').textContent = `✏️ ${brand.name} — ${model.name}`;
   document.getElementById('eds-identity').classList.add('open');
   document.getElementById('eds-class').classList.remove('open');
@@ -657,6 +972,7 @@ function openEditor(model, brand) {
   updateColourRateVisibility(model.colour_type || 'mono');
   document.querySelector(`input[name="ed-page-size"][value="${model.page_size || 'A4'}"]`).checked = true;
 
+  document.getElementById('ed-speed-ppm').value         = model.speed_ppm     != null ? model.speed_ppm     : '';
   document.getElementById('ed-mono-rate').value        = model.mono_rate     != null ? model.mono_rate     : '';
   document.getElementById('ed-colour-rate').value      = model.colour_rate   != null ? model.colour_rate   : '';
   document.getElementById('ed-rental-amount').value    = model.rental_amount != null ? model.rental_amount : '';
@@ -671,7 +987,7 @@ function openEditor(model, brand) {
 function closeEditor() {
   selectedModel = null;
   document.getElementById('model-editor').style.display = 'none';
-  document.getElementById('add-brand-section').style.display = 'block';
+  document.getElementById('opt-pool-view').style.display = 'block';
   document.querySelectorAll('.model-row').forEach(r => r.classList.remove('selected'));
 }
 
@@ -689,16 +1005,17 @@ document.getElementById('ed-save').addEventListener('click', async () => {
   const device_type = document.getElementById('ed-device-type').value;
   const colour_type = document.querySelector('input[name="ed-colour-type"]:checked').value;
   const page_size   = document.querySelector('input[name="ed-page-size"]:checked').value;
-  const mono_rate         = parseFloat(document.getElementById('ed-mono-rate').value)    || null;
+  const speed_ppm         = parseInt(document.getElementById('ed-speed-ppm').value)        || null;
+  const mono_rate         = parseFloat(document.getElementById('ed-mono-rate').value)      || null;
   const colour_rate       = colour_type === 'colour'
     ? parseFloat(document.getElementById('ed-colour-rate').value)   || null : null;
-  const rental_amount     = parseFloat(document.getElementById('ed-rental-amount').value) || null;
+  const rental_amount     = parseFloat(document.getElementById('ed-rental-amount').value)  || null;
   const optimiser_allowed = document.getElementById('ed-optimiser-allowed').checked;
 
   if (!name) { toast('Name is required'); return; }
 
   try {
-    await api('PUT', `/models/${selectedModel.model.id}`, { name, device_type, colour_type, page_size, mono_rate, colour_rate, rental_amount, optimiser_allowed });
+    await api('PUT', `/models/${selectedModel.model.id}`, { name, device_type, colour_type, page_size, speed_ppm, mono_rate, colour_rate, rental_amount, optimiser_allowed });
     toast(`"${name}" saved`);
     closeEditor();
     renderOptimiserPool();
@@ -708,10 +1025,27 @@ document.getElementById('ed-save').addEventListener('click', async () => {
 
 document.getElementById('ed-cancel').addEventListener('click', closeEditor);
 
+// ── Search ────────────────────────────────────────────────────────────────────
+
+document.getElementById('catalogue-search').addEventListener('input', render);
+
 // ── Add brand ─────────────────────────────────────────────────────────────────
 
-const newBrandInput = document.getElementById('new-brand-input');
-const addBrandBtn   = document.getElementById('add-brand-btn');
+const newBrandInput   = document.getElementById('new-brand-input');
+const addBrandRow     = document.getElementById('add-brand-row');
+const addBrandBtn     = document.getElementById('add-brand-btn');
+const confirmAddBrand = document.getElementById('confirm-add-brand');
+const cancelAddBrand  = document.getElementById('cancel-add-brand');
+
+function openAddBrandRow() {
+  addBrandRow.classList.add('open');
+  newBrandInput.value = '';
+  newBrandInput.focus();
+}
+function closeAddBrandRow() {
+  addBrandRow.classList.remove('open');
+  newBrandInput.value = '';
+}
 
 const submitBrand = async () => {
   const val = newBrandInput.value.trim();
@@ -719,13 +1053,18 @@ const submitBrand = async () => {
   try {
     await api('POST', '/brands', { name: val });
     toast(`Brand "${val}" added`);
-    newBrandInput.value = '';
+    closeAddBrandRow();
     load();
   } catch (err) { toast('Error: ' + err.message); }
 };
 
-addBrandBtn.onclick = submitBrand;
-newBrandInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitBrand(); });
+addBrandBtn.onclick    = openAddBrandRow;
+confirmAddBrand.onclick = submitBrand;
+cancelAddBrand.onclick  = closeAddBrandRow;
+newBrandInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter')  submitBrand();
+  if (e.key === 'Escape') closeAddBrandRow();
+});
 
 // ── Fleet Import ──────────────────────────────────────────────────────────────
 
@@ -822,6 +1161,437 @@ async function runImport() {
 }
 
 load();
+
+// ── Compare tab ───────────────────────────────────────────────────────────────
+
+let cmpChart  = null;
+let cmpSelected = { a: null, b: null };
+
+function cmpBadges(containerId, ct, ps, ppm) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  if (!ct) return;
+  const b1 = document.createElement('span'); b1.className = `badge-type ${ct}`; b1.textContent = ct === 'colour' ? 'Colour' : 'Mono'; el.appendChild(b1);
+  const b2 = document.createElement('span'); b2.className = `badge-size ${(ps||'A4').toLowerCase()}`; b2.textContent = ps || 'A4'; el.appendChild(b2);
+  if (ppm) { const b3 = document.createElement('span'); b3.className = 'badge-speed'; b3.textContent = ppm + 'ppm'; el.appendChild(b3); }
+}
+
+function cmpOpenDropdown(side, query) {
+  const q   = query.toLowerCase().trim();
+  const dd  = document.getElementById('cmp-dropdown-' + side);
+  dd.innerHTML = '';
+
+  const matches = [];
+  catalogue.forEach(brand => {
+    brand.models.forEach(m => {
+      const text = brand.name + ' ' + m.name;
+      if (!q || text.toLowerCase().includes(q)) {
+        matches.push({ brand, model: m, text });
+      }
+    });
+  });
+
+  if (!matches.length) {
+    dd.innerHTML = `<div class="cmp-dropdown-empty">No models match "${esc(query)}"</div>`;
+    dd.classList.add('open');
+    return;
+  }
+
+  // Group by brand
+  const grouped = {};
+  matches.forEach(({ brand, model, text }) => {
+    if (!grouped[brand.name]) grouped[brand.name] = [];
+    grouped[brand.name].push({ model, text });
+  });
+
+  Object.entries(grouped).forEach(([brandName, items]) => {
+    const grp = document.createElement('div');
+    grp.className = 'cmp-dropdown-group';
+    const lbl = document.createElement('div');
+    lbl.className = 'cmp-dropdown-brand';
+    lbl.textContent = brandName;
+    grp.appendChild(lbl);
+
+    items.forEach(({ model, text }) => {
+      const item = document.createElement('div');
+      item.className = 'cmp-dropdown-item';
+
+      const nameSpan = document.createElement('span');
+      nameSpan.style.flex = '1';
+      nameSpan.textContent = model.name;
+      item.appendChild(nameSpan);
+
+      const ct = model.colour_type || 'mono';
+      const ps = model.page_size   || 'A4';
+      const b1 = document.createElement('span'); b1.className = `badge-type ${ct}`; b1.textContent = ct === 'colour' ? 'Colour' : 'Mono'; item.appendChild(b1);
+      const b2 = document.createElement('span'); b2.className = `badge-size ${ps.toLowerCase()}`; b2.textContent = ps; item.appendChild(b2);
+      if (model.speed_ppm) { const b3 = document.createElement('span'); b3.className = 'badge-speed'; b3.textContent = model.speed_ppm + 'ppm'; item.appendChild(b3); }
+
+      item.addEventListener('mousedown', e => {
+        e.preventDefault(); // prevent input blur before click fires
+        cmpSelectModel(side, brandName, model);
+      });
+      grp.appendChild(item);
+    });
+    dd.appendChild(grp);
+  });
+
+  dd.classList.add('open');
+}
+
+function cmpCloseDropdown(side) {
+  document.getElementById('cmp-dropdown-' + side).classList.remove('open');
+}
+
+function cmpSelectModel(side, brandName, model) {
+  cmpSelected[side] = { brand: brandName, model };
+  document.getElementById('cmp-search-' + side).value = brandName + ' ' + model.name;
+  cmpCloseDropdown(side);
+  cmpBadges('cmp-badges-' + side, model.colour_type || 'mono', model.page_size || 'A4', model.speed_ppm);
+  document.getElementById('cmp-rental-'      + side).value = model.rental_amount != null ? model.rental_amount : '';
+  document.getElementById('cmp-mono-rate-'   + side).value = model.mono_rate     != null ? model.mono_rate     : '';
+  document.getElementById('cmp-colour-rate-' + side).value = model.colour_rate   != null ? model.colour_rate   : '';
+  const isColour = (model.colour_type || 'mono') === 'colour';
+  document.getElementById('cmp-colour-rate-' + side).classList.toggle('no-colour', !isColour);
+  cmpUpdate();
+}
+
+function cmpGetModel(side) {
+  if (!cmpSelected[side]) return null;
+  const { brand, model } = cmpSelected[side];
+  return {
+    label:       brand + ' ' + model.name,
+    colour_type: model.colour_type || 'mono',
+    rental:      parseFloat(document.getElementById('cmp-rental-'     + side).value) || 0,
+    mono_rate:   parseFloat(document.getElementById('cmp-mono-rate-'  + side).value) || 0,
+    colour_rate: parseFloat(document.getElementById('cmp-colour-rate-'+ side).value) || 0,
+  };
+}
+
+function fmt(n)   { return 'R ' + n.toLocaleString('en-ZA', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+function fmtN(n)  { return n.toLocaleString('en-ZA'); }
+
+function monthlyCost(m, monoVol, colourVol) {
+  return m.rental + monoVol * m.mono_rate + colourVol * m.colour_rate;
+}
+
+function crossoverVolume(a, b, monoRatio, colourRatio) {
+  // cost_a = cost_b  →  solve for total volume V
+  // a.rental + V*(monoRatio*a.mono_rate + colourRatio*a.colour_rate) =
+  // b.rental + V*(monoRatio*b.mono_rate + colourRatio*b.colour_rate)
+  const rateA = monoRatio * a.mono_rate + colourRatio * a.colour_rate;
+  const rateB = monoRatio * b.mono_rate + colourRatio * b.colour_rate;
+  if (Math.abs(rateA - rateB) < 0.000001) return null; // parallel lines
+  const v = (b.rental - a.rental) / (rateA - rateB);
+  return v > 0 ? v : null;
+}
+
+function cmpUpdate() {
+  const a = cmpGetModel('a');
+  const b = cmpGetModel('b');
+  if (!a || !b) {
+    document.getElementById('cmp-result').style.display = 'none';
+    document.getElementById('cmp-chart-wrap').style.display = 'none';
+    return;
+  }
+
+  const monoVol   = parseInt(document.getElementById('cmp-mono-vol').value)   || 0;
+  const colourVol = parseInt(document.getElementById('cmp-colour-vol').value) || 0;
+  const totalVol  = monoVol + colourVol || 1;
+  const monoR     = monoVol   / totalVol;
+  const colourR   = colourVol / totalVol;
+
+  const costA = monthlyCost(a, monoVol, colourVol);
+  const costB = monthlyCost(b, monoVol, colourVol);
+  const diff  = Math.abs(costA - costB);
+  const winner = costA < costB ? 'a' : costA > costB ? 'b' : null;
+
+  // Update cost cards
+  document.getElementById('cmp-result').style.display = 'block';
+  document.getElementById('cmp-name-a').textContent  = a.label;
+  document.getElementById('cmp-name-b').textContent  = b.label;
+  document.getElementById('cmp-total-a').textContent = fmt(costA);
+  document.getElementById('cmp-total-b').textContent = fmt(costB);
+  document.getElementById('cmp-detail-a').textContent =
+    `Rental: ${fmt(a.rental)} · Mono: ${fmt(monoVol * a.mono_rate)} · Colour: ${fmt(colourVol * a.colour_rate)}`;
+  document.getElementById('cmp-detail-b').textContent =
+    `Rental: ${fmt(b.rental)} · Mono: ${fmt(monoVol * b.mono_rate)} · Colour: ${fmt(colourVol * b.colour_rate)}`;
+
+  document.getElementById('cmp-cost-a').classList.toggle('winner', winner === 'a');
+  document.getElementById('cmp-cost-b').classList.toggle('winner', winner === 'b');
+
+  // Crossover callout
+  const xEl  = document.getElementById('cmp-crossover');
+  const xVol = crossoverVolume(a, b, monoR, colourR);
+  if (xVol === null) {
+    const cheaper = costA <= costB ? `<strong>${esc(a.label)}</strong>` : `<strong>${esc(b.label)}</strong>`;
+    xEl.innerHTML = `Lines are parallel — ${cheaper} is always cheaper at these rates.`;
+  } else {
+    const xMono   = Math.round(xVol * monoR);
+    const xColour = Math.round(xVol * colourR);
+    const cheapBelow = costA < costB ? b.label : a.label;
+    const cheapAbove = costA < costB ? a.label : b.label;
+    xEl.innerHTML =
+      `Cutover at <strong>${fmtN(Math.round(xVol))} pages/month</strong> ` +
+      `(~${fmtN(xMono)} mono · ${fmtN(xColour)} colour).<br>` +
+      `Below that: <strong>${esc(cheapBelow)}</strong> is cheaper. ` +
+      `Above that: <strong>${esc(cheapAbove)}</strong> is cheaper.`;
+  }
+
+  // Chart
+  const maxVol = Math.max(xVol ? xVol * 2.2 : totalVol * 3, totalVol * 2, 1000);
+  const steps  = 60;
+  const labels = [];
+  const dataA  = [];
+  const dataB  = [];
+  for (let i = 0; i <= steps; i++) {
+    const v = (i / steps) * maxVol;
+    labels.push(Math.round(v));
+    dataA.push(+(monthlyCost(a, v * monoR, v * colourR).toFixed(2)));
+    dataB.push(+(monthlyCost(b, v * monoR, v * colourR).toFixed(2)));
+  }
+
+  document.getElementById('cmp-chart-wrap').style.display = 'block';
+  const ctx = document.getElementById('cmp-chart').getContext('2d');
+
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+  const gridColour  = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)';
+  const tickColour  = isDark ? '#9ca3af' : '#6b7280';
+  const annotColour = isDark ? 'rgba(251,191,36,0.5)' : 'rgba(180,130,0,0.5)';
+
+  const plugins = [];
+  // Crossover vertical annotation drawn as a custom plugin
+  const xAnnotPlugin = {
+    id: 'xAnnot',
+    afterDraw(chart) {
+      if (!xVol) return;
+      const xPx = chart.scales.x.getPixelForValue(Math.round(xVol));
+      if (xPx < chart.chartArea.left || xPx > chart.chartArea.right) return;
+      const ctx2 = chart.ctx;
+      ctx2.save();
+      ctx2.beginPath();
+      ctx2.setLineDash([5,4]);
+      ctx2.strokeStyle = annotColour;
+      ctx2.lineWidth = 1.5;
+      ctx2.moveTo(xPx, chart.chartArea.top);
+      ctx2.lineTo(xPx, chart.chartArea.bottom);
+      ctx2.stroke();
+      ctx2.setLineDash([]);
+      ctx2.fillStyle = isDark ? '#fbbf24' : '#b45309';
+      ctx2.font = '11px sans-serif';
+      ctx2.fillText(fmtN(Math.round(xVol)) + ' pgs', xPx + 4, chart.chartArea.top + 14);
+      ctx2.restore();
+    }
+  };
+
+  // Current volume annotation
+  const volAnnotPlugin = {
+    id: 'volAnnot',
+    afterDraw(chart) {
+      const v = monoVol + colourVol;
+      if (!v) return;
+      const xPx = chart.scales.x.getPixelForValue(v);
+      if (xPx < chart.chartArea.left || xPx > chart.chartArea.right) return;
+      const ctx2 = chart.ctx;
+      ctx2.save();
+      ctx2.beginPath();
+      ctx2.setLineDash([3,3]);
+      ctx2.strokeStyle = isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.2)';
+      ctx2.lineWidth = 1;
+      ctx2.moveTo(xPx, chart.chartArea.top);
+      ctx2.lineTo(xPx, chart.chartArea.bottom);
+      ctx2.stroke();
+      ctx2.setLineDash([]);
+      ctx2.fillStyle = tickColour;
+      ctx2.font = '10px sans-serif';
+      ctx2.fillText('current', xPx + 4, chart.chartArea.bottom - 6);
+      ctx2.restore();
+    }
+  };
+
+  if (cmpChart) cmpChart.destroy();
+  cmpChart = new Chart(ctx, {
+    type: 'line',
+    plugins: [xAnnotPlugin, volAnnotPlugin],
+    data: {
+      labels,
+      datasets: [
+        {
+          label: a.label,
+          data: dataA,
+          borderColor: '#60a5fa',
+          backgroundColor: 'rgba(96,165,250,0.08)',
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0,
+          fill: false,
+        },
+        {
+          label: b.label,
+          data: dataB,
+          borderColor: '#34d399',
+          backgroundColor: 'rgba(52,211,153,0.08)',
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0,
+          fill: false,
+        },
+      ]
+    },
+    options: {
+      animation: false,
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: tickColour, font: { size: 12 }, boxWidth: 16 } },
+        tooltip: {
+          callbacks: {
+            title: items => fmtN(items[0].parsed.x) + ' pages/month',
+            label: item => ` ${item.dataset.label}: ${fmt(item.parsed.y)}`,
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          ticks: { color: tickColour, maxTicksLimit: 8,
+                   callback: v => v >= 1000 ? (v/1000).toFixed(v%1000===0?0:1)+'k' : v },
+          grid: { color: gridColour },
+          title: { display: true, text: 'Pages / month', color: tickColour, font: { size: 11 } }
+        },
+        y: {
+          ticks: { color: tickColour, callback: v => 'R ' + (v>=1000?(v/1000).toFixed(1)+'k':v) },
+          grid: { color: gridColour },
+          title: { display: true, text: 'Monthly cost (R)', color: tickColour, font: { size: 11 } }
+        }
+      }
+    }
+  });
+}
+
+// Wire up all compare inputs
+['a','b'].forEach(s => {
+  const inp = document.getElementById('cmp-search-' + s);
+  inp.addEventListener('input',  e => cmpOpenDropdown(s, e.target.value));
+  inp.addEventListener('focus',  e => cmpOpenDropdown(s, e.target.value));
+  inp.addEventListener('blur',   () => setTimeout(() => cmpCloseDropdown(s), 150));
+  inp.addEventListener('keydown', e => { if (e.key === 'Escape') { cmpCloseDropdown(s); inp.blur(); } });
+  ['cmp-rental-','cmp-mono-rate-','cmp-colour-rate-'].forEach(id => {
+    document.getElementById(id + s).addEventListener('input', cmpUpdate);
+  });
+});
+document.getElementById('cmp-mono-vol').addEventListener('input', e => {
+  document.getElementById('cmp-mono-vol-val').textContent = fmtN(parseInt(e.target.value));
+  cmpUpdate();
+});
+document.getElementById('cmp-colour-vol').addEventListener('input', e => {
+  document.getElementById('cmp-colour-vol-val').textContent = fmtN(parseInt(e.target.value));
+  cmpUpdate();
+});
+
+load();
+
+// ── Service Agents ────────────────────────────────────────────────────────────
+
+let vendors = [];
+let editingVendorId = null;
+
+async function loadVendors() {
+  try {
+    vendors = await api('GET', '/vendors');
+    renderVendorTable();
+  } catch (e) { showToast('Could not load vendors: ' + e.message, true); }
+}
+
+function renderVendorTable() {
+  const tbody = document.getElementById('vendor-tbody');
+  const empty = document.getElementById('vendor-empty');
+  document.getElementById('vendor-count').textContent = vendors.length + ' agent' + (vendors.length !== 1 ? 's' : '');
+  if (!vendors.length) { tbody.innerHTML = ''; empty.style.display = ''; return; }
+  empty.style.display = 'none';
+  const typeBadge = t => t === 'GO'
+    ? '<span style="background:#14291e;color:#86efac;padding:2px 8px;border-radius:10px;font-size:11px;">GO Branch</span>'
+    : '<span style="background:#2d1f0a;color:#fb923c;padding:2px 8px;border-radius:10px;font-size:11px;">B2B</span>';
+  tbody.innerHTML = vendors.map(v => `
+    <tr style="border-bottom:1px solid var(--border); cursor:pointer;" onclick="openVendorModal(${v.id})">
+      <td style="padding:9px 8px; font-weight:500;">${esc(v.name)}</td>
+      <td style="padding:9px 8px;">${typeBadge(v.type)}</td>
+      <td style="padding:9px 8px; color:var(--muted);">${esc(v.city)}</td>
+      <td style="padding:9px 8px; font-size:12px;">${esc(v.admin_name)}<br><span style="color:var(--muted)">${esc(v.admin_phone)}</span></td>
+      <td style="padding:9px 8px; font-size:12px;">${esc(v.tech_manager_name)}<br><span style="color:var(--muted)">${esc(v.tech_manager_phone)}</span></td>
+      <td style="padding:9px 8px; font-size:12px;">${esc(v.service_controller_name)}<br><span style="color:var(--muted)">${esc(v.service_controller_phone)}</span></td>
+      <td style="padding:9px 8px; text-align:right;"><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openVendorModal(${v.id})">Edit</button></td>
+    </tr>`).join('');
+}
+
+function openVendorModal(id) {
+  editingVendorId = id;
+  const v = id ? vendors.find(x => x.id === id) : {};
+  document.getElementById('vendor-modal-title').textContent = id ? 'Edit Service Agent' : 'Add Service Agent';
+  document.getElementById('v-name').value        = v?.name || '';
+  document.getElementById('v-type').value        = v?.type || 'GO';
+  document.getElementById('v-city').value        = v?.city || '';
+  document.getElementById('v-lat').value         = v?.lat ?? '';
+  document.getElementById('v-lng').value         = v?.lng ?? '';
+  document.getElementById('v-admin-name').value  = v?.admin_name || '';
+  document.getElementById('v-admin-phone').value = v?.admin_phone || '';
+  document.getElementById('v-tm-name').value     = v?.tech_manager_name || '';
+  document.getElementById('v-tm-phone').value    = v?.tech_manager_phone || '';
+  document.getElementById('v-sc-name').value     = v?.service_controller_name || '';
+  document.getElementById('v-sc-phone').value    = v?.service_controller_phone || '';
+  document.getElementById('v-delete-btn').style.display = id ? '' : 'none';
+  document.getElementById('vendor-modal').classList.add('open');
+}
+
+function closeVendorModal() {
+  document.getElementById('vendor-modal').classList.remove('open');
+  editingVendorId = null;
+}
+
+function vendorFormData() {
+  return {
+    name:                     document.getElementById('v-name').value.trim(),
+    type:                     document.getElementById('v-type').value,
+    city:                     document.getElementById('v-city').value.trim(),
+    lat:                      document.getElementById('v-lat').value,
+    lng:                      document.getElementById('v-lng').value,
+    admin_name:               document.getElementById('v-admin-name').value.trim(),
+    admin_phone:              document.getElementById('v-admin-phone').value.trim(),
+    tech_manager_name:        document.getElementById('v-tm-name').value.trim(),
+    tech_manager_phone:       document.getElementById('v-tm-phone').value.trim(),
+    service_controller_name:  document.getElementById('v-sc-name').value.trim(),
+    service_controller_phone: document.getElementById('v-sc-phone').value.trim(),
+  };
+}
+
+async function saveVendor() {
+  const d = vendorFormData();
+  if (!d.name) { alert('Name is required.'); return; }
+  try {
+    if (editingVendorId) {
+      await api('PUT', `/vendors/${editingVendorId}`, d);
+    } else {
+      await api('POST', '/vendors', d);
+    }
+    closeVendorModal();
+    await loadVendors();
+    showToast('Saved.');
+  } catch (e) { showToast('Error: ' + e.message, true); }
+}
+
+async function deleteVendor() {
+  if (!editingVendorId || !confirm('Delete this service agent? This cannot be undone.')) return;
+  try {
+    await api('DELETE', `/vendors/${editingVendorId}`);
+    closeVendorModal();
+    await loadVendors();
+    showToast('Deleted.');
+  } catch (e) { showToast('Error: ' + e.message, true); }
+}
+
+document.getElementById('vendor-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('vendor-modal')) closeVendorModal();
+});
 </script>
 </body>
 </html>

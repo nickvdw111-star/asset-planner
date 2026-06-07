@@ -300,7 +300,6 @@
   <h1>PrintMap</h1>
   <span id="floor-label">Loading…</span>
   <button class="btn btn-ghost btn-sm" id="hand-tool-btn" style="margin-left:auto" title="Hand tool — pan the map (or hold Space)">✋</button>
-  <button class="btn btn-ghost btn-sm" id="select-mode-btn" title="Select mode — click devices to select for bulk delete or edit">☑ Select</button>
   <div id="zoom-bar" title="Zoom  (+/= zoom in · − zoom out · 0 reset)">
     🔍
     <button class="btn btn-ghost btn-sm" id="zoom-out-btn" title="Zoom out">−</button>
@@ -366,6 +365,10 @@
     <div class="spacer"></div>
 
     <div id="stats-panel"></div>
+
+    <hr class="div">
+    <div class="section-label">Bulk Actions</div>
+    <button class="sidebar-action" id="select-mode-btn">☐ Select Devices</button>
 
     <hr class="div">
     <div class="section-label">Export</div>
@@ -1416,7 +1419,10 @@ document.getElementById('export-list-btn').addEventListener('click', () => {
 
 function setSelectMode(on) {
   selectMode = on;
-  document.getElementById('select-mode-btn').classList.toggle('active', on);
+  const btn = document.getElementById('select-mode-btn');
+  btn.textContent = on ? '☑ Select Devices (on)' : '☐ Select Devices';
+  btn.style.borderColor  = on ? 'var(--accent-h)' : '';
+  btn.style.color        = on ? 'var(--accent-h)' : '';
   canvasArea.classList.toggle('select-mode', on);
   if (!on) {
     clearSelection();

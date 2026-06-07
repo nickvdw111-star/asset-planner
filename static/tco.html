@@ -90,6 +90,8 @@
     .device-name-wrap { display: flex; flex-direction: column; gap: 1px; }
     .device-location { font-size: 11px; color: var(--muted2); padding: 0 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+    .col-chk    { width: 32px; text-align: center; }
+    .col-chk input[type=checkbox] { accent-color: var(--accent); cursor: pointer; width: 14px; height: 14px; }
     .col-num    { width: 32px; color: var(--muted2); text-align: center; font-size: 11px; }
     .col-device { width: 160px; }
     .col-brand  { width: 120px; }
@@ -101,6 +103,20 @@
     .col-period { width: 100px; }
     .col-tco    { width: 115px; text-align: right; }
     .col-del    { width: 32px; }
+
+    #tco-table tbody tr.row-selected td { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+
+    #bulk-tco-bar {
+      display: none; align-items: center; gap: 10px;
+      padding: 8px 24px; background: var(--surface2);
+      border-bottom: 2px solid var(--accent-h); font-size: 12px; flex-shrink: 0;
+    }
+    #bulk-tco-bar.visible { display: flex; }
+    #bulk-tco-count { font-weight: 600; color: var(--text); min-width: 80px; }
+
+    .be-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 14px; }
+    .be-chk { flex-shrink: 0; width: 16px; margin-top: 24px; accent-color: var(--accent); cursor: pointer; }
+    .be-body { flex: 1; }
 
     .tco-value { font-weight: 700; color: var(--accent-h); text-align: right; padding-right: 10px; white-space: nowrap; }
     .tco-value.zero { color: var(--muted2); font-weight: 400; }
@@ -191,6 +207,15 @@
   <span class="hint" id="action-hint"></span>
 </div>
 
+<div id="bulk-tco-bar">
+  <span id="bulk-tco-count">0 selected</span>
+  <button class="btn btn-ghost btn-sm" onclick="selectAllTcoRows(true)">Select All</button>
+  <button class="btn btn-ghost btn-sm" onclick="selectAllTcoRows(false)">Deselect All</button>
+  <div style="flex:1"></div>
+  <button class="btn btn-neutral btn-sm" onclick="openBulkTcoEdit()">✏ Edit Selected</button>
+  <button class="btn btn-sm" style="background:var(--danger);color:var(--danger-t);border:1px solid rgba(239,68,68,0.4);" onclick="bulkTcoDelete()">✕ Delete Selected</button>
+</div>
+
 <!-- Table panel (current & future) -->
 <div class="tco-wrap" id="table-panel">
   <div class="summary-bar" id="summary-bar" style="display:none">
@@ -205,6 +230,7 @@
     <table id="tco-table">
       <thead>
         <tr>
+          <th class="col-chk"><input type="checkbox" id="select-all-chk" title="Select all" onchange="selectAllTcoRows(this.checked)"></th>
           <th class="col-num">#</th>
           <th class="col-device">Device</th>
           <th class="col-brand">Brand</th>
@@ -223,7 +249,7 @@
       <tbody id="tco-body"></tbody>
       <tfoot>
         <tr id="totals-row" style="display:none">
-          <td colspan="11" class="totals-label">TOTAL</td>
+          <td colspan="12" class="totals-label">TOTAL</td>
           <td class="totals-tco" id="total-tco">R 0.00</td>
           <td></td>
         </tr>
@@ -247,6 +273,78 @@
 
 <div id="toast"></div>
 
+<!-- Bulk edit modal -->
+<div id="bulk-tco-modal" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);display:none;align-items:center;justify-content:center;z-index:9000;">
+  <div style="background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:24px;width:440px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.5);">
+    <h2 style="font-size:16px;font-weight:600;margin-bottom:6px;">✏ Edit Selected Rows</h2>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:18px;">Tick the fields you want to update — unticked fields are left unchanged.</p>
+
+    <div class="be-row">
+      <input type="checkbox" id="btco-brand-chk" class="be-chk">
+      <div class="be-body">
+        <div style="display:flex;gap:10px;">
+          <div style="flex:1">
+            <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Brand</label>
+            <select id="btco-brand" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px;padding:7px 10px;font-family:inherit;" onchange="onBtcoBrandChange();document.getElementById('btco-brand-chk').checked=true">
+              <option value="">— Select brand —</option>
+            </select>
+          </div>
+          <div style="flex:1">
+            <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Model</label>
+            <select id="btco-model" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px;padding:7px 10px;font-family:inherit;" onchange="document.getElementById('btco-brand-chk').checked=true">
+              <option value="">— Select brand first —</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="be-row">
+      <input type="checkbox" id="btco-rates-chk" class="be-chk">
+      <div class="be-body" style="display:flex;gap:10px;">
+        <div style="flex:1">
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Mono Rate (R/page)</label>
+          <input id="btco-mono-rate" type="number" min="0" step="0.0001" placeholder="0.0000" oninput="document.getElementById('btco-rates-chk').checked=true"
+            style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px;padding:7px 10px;font-family:inherit;box-sizing:border-box;">
+        </div>
+        <div style="flex:1">
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Colour Rate (R/page)</label>
+          <input id="btco-colour-rate" type="number" min="0" step="0.0001" placeholder="0.0000" oninput="document.getElementById('btco-rates-chk').checked=true"
+            style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px;padding:7px 10px;font-family:inherit;box-sizing:border-box;">
+        </div>
+      </div>
+    </div>
+
+    <div class="be-row">
+      <input type="checkbox" id="btco-rental-chk" class="be-chk">
+      <div class="be-body" style="display:flex;gap:10px;">
+        <div style="flex:1">
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Rental Amount (R/mo)</label>
+          <input id="btco-rental-amount" type="number" min="0" step="0.01" placeholder="0.00" oninput="document.getElementById('btco-rental-chk').checked=true"
+            style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px;padding:7px 10px;font-family:inherit;box-sizing:border-box;">
+        </div>
+        <div style="flex:1">
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Rental Period</label>
+          <select id="btco-rental-period" onchange="document.getElementById('btco-rental-chk').checked=true"
+            style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px;padding:7px 10px;font-family:inherit;">
+            <option value="">No rental</option>
+            <option value="12">12 months</option>
+            <option value="24">24 months</option>
+            <option value="36">36 months</option>
+            <option value="72">72 months</option>
+            <option value="Evergreen">Evergreen</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
+      <button class="btn btn-neutral" onclick="document.getElementById('bulk-tco-modal').style.display='none'">Cancel</button>
+      <button class="btn btn-primary" onclick="applyBulkTcoEdit()">Apply to Selected</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -256,6 +354,7 @@ let currentClientId = null;
 let activeScenario  = 'current';
 let nextId = 1;
 let saveTimer = null;
+let selectedRowIds = new Set();
 
 const scenarios = {
   current: { rows: [], loaded: false },
@@ -589,6 +688,8 @@ async function removeRow(id) {
 }
 
 function renderRows() {
+  selectedRowIds.clear();
+  updateBulkTcoBar();
   const rows  = scenarios[activeScenario]?.rows || [];
   const tbody = document.getElementById('tco-body');
   tbody.innerHTML = rows.map((r, i) => {
@@ -596,6 +697,7 @@ function renderRows() {
     const tcoClass = tco === 0 ? 'tco-value zero' : 'tco-value';
     return `
     <tr id="row-${r.id}">
+      <td class="col-chk"><input type="checkbox" class="row-chk" data-id="${r.id}"></td>
       <td class="col-num">${i + 1}</td>
       <td class="col-device">
         <div class="device-name-wrap">
@@ -648,6 +750,16 @@ function renderRows() {
 }
 
 function bindRowEvents() {
+  document.querySelectorAll('.row-chk').forEach(chk => {
+    chk.addEventListener('change', e => {
+      const id = parseInt(e.target.dataset.id);
+      const tr = document.getElementById(`row-${id}`);
+      if (e.target.checked) { selectedRowIds.add(id); tr?.classList.add('row-selected'); }
+      else                  { selectedRowIds.delete(id); tr?.classList.remove('row-selected'); }
+      updateBulkTcoBar();
+    });
+  });
+
   document.querySelectorAll('.r-brand').forEach(sel => {
     sel.addEventListener('change', e => {
       const id  = parseInt(e.target.dataset.id);
@@ -909,6 +1021,120 @@ document.getElementById('export-btn').addEventListener('click', () => {
   toast('CSV exported');
 });
 
+
+// ── Bulk select (TCO) ─────────────────────────────────────────────────────────
+
+function updateBulkTcoBar() {
+  const n = selectedRowIds.size;
+  document.getElementById('bulk-tco-count').textContent = `${n} row${n !== 1 ? 's' : ''} selected`;
+  document.getElementById('bulk-tco-bar').classList.toggle('visible', n > 0);
+  const allChk = document.getElementById('select-all-chk');
+  const total  = scenarios[activeScenario]?.rows.length || 0;
+  if (allChk) {
+    allChk.checked       = total > 0 && n === total;
+    allChk.indeterminate = n > 0 && n < total;
+  }
+}
+
+function selectAllTcoRows(on) {
+  selectedRowIds.clear();
+  document.querySelectorAll('.row-chk').forEach(chk => {
+    chk.checked = on;
+    const id = parseInt(chk.dataset.id);
+    const tr = document.getElementById(`row-${id}`);
+    if (on) { selectedRowIds.add(id); tr?.classList.add('row-selected'); }
+    else    { tr?.classList.remove('row-selected'); }
+  });
+  updateBulkTcoBar();
+}
+
+function bulkTcoDelete() {
+  const n = selectedRowIds.size;
+  if (!n) return;
+  if (!confirm(`Delete ${n} selected row${n !== 1 ? 's' : ''}?`)) return;
+  const toDelete = new Set(selectedRowIds);
+  const arr = scenarios[activeScenario].rows;
+  const toRemove = arr.filter(r => toDelete.has(r.id));
+
+  toRemove.forEach(r => {
+    if (r.device_id && activeScenario === 'current') {
+      // Don't also offer floor-plan removal for bulk — just remove from TCO
+    }
+  });
+
+  scenarios[activeScenario].rows = arr.filter(r => !toDelete.has(r.id));
+  renderRows();
+  scheduleScenarioSave();
+}
+
+function openBulkTcoEdit() {
+  if (!selectedRowIds.size) return;
+  const brandSel = document.getElementById('btco-brand');
+  brandSel.innerHTML = '<option value="">— Select brand —</option>';
+  catalogue.forEach(b => {
+    const o = document.createElement('option');
+    o.value = b.name; o.textContent = b.name;
+    brandSel.appendChild(o);
+  });
+  document.getElementById('btco-model').innerHTML = '<option value="">— Select brand first —</option>';
+  ['btco-brand-chk','btco-rates-chk','btco-rental-chk'].forEach(id => document.getElementById(id).checked = false);
+  ['btco-mono-rate','btco-colour-rate','btco-rental-amount'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('bulk-tco-modal').style.display = 'flex';
+}
+
+function onBtcoBrandChange() {
+  const val   = document.getElementById('btco-brand').value;
+  const brand = catalogue.find(b => b.name === val);
+  const sel   = document.getElementById('btco-model');
+  sel.innerHTML = '<option value="">— Select model —</option>';
+  (brand?.models || []).forEach(m => {
+    const o = document.createElement('option');
+    o.value = m.name; o.textContent = m.name;
+    sel.appendChild(o);
+  });
+  // Auto-fill rates when model selected
+  sel.onchange = function() {
+    const model = brand?.models.find(m => m.name === this.value);
+    if (model?.mono_rate   != null) { document.getElementById('btco-mono-rate').value   = model.mono_rate;   document.getElementById('btco-rates-chk').checked = true; }
+    if (model?.colour_rate != null) { document.getElementById('btco-colour-rate').value = model.colour_rate; document.getElementById('btco-rates-chk').checked = true; }
+  };
+}
+
+function applyBulkTcoEdit() {
+  const updates = {};
+  if (document.getElementById('btco-brand-chk').checked) {
+    updates.brand = document.getElementById('btco-brand').value;
+    updates.model = document.getElementById('btco-model').value;
+  }
+  if (document.getElementById('btco-rates-chk').checked) {
+    updates.mono_rate   = parseFloat(document.getElementById('btco-mono-rate').value)   || null;
+    updates.colour_rate = parseFloat(document.getElementById('btco-colour-rate').value) || null;
+  }
+  if (document.getElementById('btco-rental-chk').checked) {
+    updates.rental      = parseFloat(document.getElementById('btco-rental-amount').value) || null;
+    updates.period      = document.getElementById('btco-rental-period').value || '';
+  }
+  if (!Object.keys(updates).length) { alert('Tick at least one field to update.'); return; }
+  document.getElementById('bulk-tco-modal').style.display = 'none';
+
+  const rows = scenarios[activeScenario].rows;
+  rows.forEach(r => {
+    if (!selectedRowIds.has(r.id)) return;
+    Object.assign(r, updates);
+    const tr = document.getElementById(`row-${r.id}`);
+    if (!tr) return;
+    if (updates.brand !== undefined) {
+      tr.querySelector('.r-brand').innerHTML = brandOptions(r.brand);
+      tr.querySelector('.r-model').innerHTML = modelOptions(r.brand, r.model);
+    }
+    if (updates.mono_rate   !== undefined && tr.querySelector('.r-mono-rate'))   tr.querySelector('.r-mono-rate').value   = r.mono_rate   ?? '';
+    if (updates.colour_rate !== undefined && tr.querySelector('.r-colour-rate')) tr.querySelector('.r-colour-rate').value = r.colour_rate ?? '';
+    if (updates.rental      !== undefined && tr.querySelector('.r-rental'))      tr.querySelector('.r-rental').value      = r.rental      ?? '';
+    if (updates.period      !== undefined && tr.querySelector('.r-period'))      tr.querySelector('.r-period').value      = r.period      ?? '';
+    recalcRow(r.id);
+  });
+  scheduleScenarioSave();
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 

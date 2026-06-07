@@ -4,6 +4,17 @@ All notable changes to PrintMap are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [0.2.2] - 2026-06-07
+### Added
+- Replacement scenario tabs appear in TCO Calculator automatically for any replacement floors created in the Planner
+- Clicking a replacement tab in TCO loads the devices from that floor (auto-generated from the floor plan on first open); edits auto-save per floor
+- Replacement scenario tabs in Planner can be renamed by double-clicking the tab label; name is persisted and reflects in both Planner and TCO
+- Backend: `PATCH /api/floors/<id>/rename`, `GET /api/clients/<cid>/replacement-floors`, `GET/PUT /api/floors/<fid>/tco` endpoints
+
+### Fixed
+- TCO page now also loads replacement floor tabs when navigated to with a `?client=` URL parameter
+- Removed dead "Future State" tab from TCO — replaced entirely by live replacement scenario tabs from the Planner
+
 ## [0.2.1] - 2026-06-07
 ### Added
 - Replacement Scenario feature in Planner: click "+ Replacement" to clone the current floor (floor plan + all devices) as a new scenario tab; create as many as needed; delete any replacement with ×

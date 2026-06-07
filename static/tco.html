@@ -182,9 +182,9 @@
 </div>
 
 <div id="scenario-tabs">
-  <div class="stab active" id="stab-current"   onclick="switchScenario('current')">Current State</div>
-  <div class="stab"        id="stab-future"    onclick="switchScenario('future')">Future State</div>
-  <div class="stab"        id="stab-optimised" onclick="switchScenario('optimised')">Optimised</div>
+  <div class="stab active" data-scenario="current"   onclick="switchScenario('current')">Current State</div>
+  <div id="replacement-tabs"></div>
+  <div class="stab"        data-scenario="optimised" onclick="switchScenario('optimised')">Optimised</div>
 </div>
 
 <div id="action-bar">
@@ -259,8 +259,8 @@ let saveTimer = null;
 
 const scenarios = {
   current: { rows: [], loaded: false },
-  future:  { rows: [], loaded: false },
 };
+let replacementFloors = []; // [{id, scenario_name, building_name, city_name}]
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
@@ -341,8 +341,11 @@ async function loadClients() {
 document.getElementById('client-sel').addEventListener('change', async e => {
   const id = parseInt(e.target.value);
   currentClientId = id || null;
+  // Reset all scenarios
+  Object.keys(scenarios).forEach(k => delete scenarios[k]);
   scenarios.current = { rows: [], loaded: false };
-  scenarios.future  = { rows: [], loaded: false };
+  replacementFloors = [];
+  renderReplacementTabs([]);
 
   if (!id) {
     renderRows();
@@ -353,13 +356,19 @@ document.getElementById('client-sel').addEventListener('change', async e => {
 
   setNavLinks(id);
 
-  if (activeScenario !== 'optimised') {
-    setStatus(`Loading ${activeScenario === 'current' ? 'current' : 'future'} state…`);
-    await loadScenario(activeScenario);
+  // Load replacement floors for this client
+  loadReplacementFloors(id);
+
+  if (activeScenario === 'current') {
+    setStatus('Loading current state…');
+    await loadScenario('current');
     setStatus('');
     renderRows();
-  } else {
+  } else if (activeScenario === 'optimised') {
     resetOptimised();
+  } else {
+    // Was on a replacement tab for a previous client — switch back to current
+    await switchScenario('current');
   }
 });
 
@@ -368,8 +377,8 @@ document.getElementById('client-sel').addEventListener('change', async e => {
 async function switchScenario(name) {
   activeScenario = name;
 
-  ['current', 'future', 'optimised'].forEach(t => {
-    document.getElementById(`stab-${t}`).classList.toggle('active', t === name);
+  document.querySelectorAll('#scenario-tabs .stab').forEach(el => {
+    el.classList.toggle('active', el.dataset.scenario === name);
   });
 
   const tablePanel = document.getElementById('table-panel');
@@ -389,6 +398,7 @@ async function switchScenario(name) {
   hdrActions.style.display = '';
   updateActionBar();
 
+  if (!scenarios[name]) scenarios[name] = { rows: [], loaded: false };
   if (currentClientId && !scenarios[name].loaded) {
     setStatus('Loading…');
     await loadScenario(name);
@@ -413,17 +423,13 @@ function updateActionBar() {
     hint.style.marginLeft = '8px';
     hint.textContent = 'Pull live device data from the asset planner into this scenario';
     bar.appendChild(hint);
-  } else if (activeScenario === 'future') {
-    const btn = document.createElement('button');
-    btn.id = 'copy-btn';
-    btn.className = 'btn btn-neutral btn-sm';
-    btn.textContent = '📋 Copy from Current State';
-    btn.onclick = copyFromCurrent;
-    bar.appendChild(btn);
+  } else if (activeScenario.startsWith('floor_')) {
+    const floor = replacementFloors.find(f => `floor_${f.id}` === activeScenario);
     const hint = document.createElement('span');
     hint.className = 'hint';
-    hint.style.marginLeft = '8px';
-    hint.textContent = 'Start the future proposal from the current fleet — then edit';
+    hint.textContent = floor
+      ? `Replacement scenario from planner — ${floor.building_name} · ${floor.city_name}. Edit device details in the Planner.`
+      : 'Replacement scenario — edit device assignments in the Planner.';
     bar.appendChild(hint);
   } else {
     const btn = document.createElement('button');
@@ -440,10 +446,42 @@ function updateActionBar() {
   }
 }
 
-async function loadScenario(name) {
-  if (!currentClientId) return;
+async function loadReplacementFloors(clientId) {
   try {
-    const data = await api('GET', `/clients/${currentClientId}/tco/${name}`);
+    replacementFloors = await api('GET', `/clients/${clientId}/replacement-floors`);
+  } catch {
+    replacementFloors = [];
+  }
+  renderReplacementTabs(replacementFloors);
+}
+
+function renderReplacementTabs(floors) {
+  const container = document.getElementById('replacement-tabs');
+  container.innerHTML = '';
+  floors.forEach(f => {
+    const key  = `floor_${f.id}`;
+    const name = f.scenario_name || f.label;
+    const tab  = document.createElement('div');
+    tab.className = 'stab' + (activeScenario === key ? ' active' : '');
+    tab.dataset.scenario = key;
+    tab.textContent = name;
+    tab.title = `${f.building_name} · ${f.city_name}`;
+    tab.addEventListener('click', () => switchScenario(key));
+    container.appendChild(tab);
+  });
+}
+
+async function loadScenario(name) {
+  if (!scenarios[name]) scenarios[name] = { rows: [], loaded: false };
+  try {
+    let data;
+    if (name.startsWith('floor_')) {
+      const fid = name.slice(6);
+      data = await api('GET', `/floors/${fid}/tco`);
+    } else {
+      if (!currentClientId) return;
+      data = await api('GET', `/clients/${currentClientId}/tco/${name}`);
+    }
     scenarios[name].rows   = (data || []).map(r => ({ ...r, id: nextId++ }));
     scenarios[name].loaded = true;
   } catch {
@@ -455,7 +493,8 @@ async function loadScenario(name) {
 // ── Save ──────────────────────────────────────────────────────────────────────
 
 function scheduleScenarioSave() {
-  if (!currentClientId || activeScenario === 'optimised') return;
+  if (activeScenario === 'optimised') return;
+  if (!activeScenario.startsWith('floor_') && !currentClientId) return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(saveScenario, 800);
 }
@@ -479,7 +518,7 @@ function snapshot() {
 }
 
 async function saveScenario() {
-  if (!currentClientId || activeScenario === 'optimised') return;
+  if (activeScenario === 'optimised') return;
   snapshot();
   const name = activeScenario;
   const payload = scenarios[name].rows.map(r => ({
@@ -498,7 +537,12 @@ async function saveScenario() {
   }));
   setSyncStatus('saving', '↑ Saving…');
   try {
-    await api('PUT', `/clients/${currentClientId}/tco/${name}`, payload);
+    if (name.startsWith('floor_')) {
+      const fid = name.slice(6);
+      await api('PUT', `/floors/${fid}/tco`, payload);
+    } else if (currentClientId) {
+      await api('PUT', `/clients/${currentClientId}/tco/${name}`, payload);
+    }
     setSyncStatus('saved', '✓ Saved');
     setTimeout(() => setSyncStatus('', ''), 2000);
   } catch {
@@ -527,8 +571,7 @@ async function removeRow(id) {
 
   const row = arr[idx];
 
-  // If this row is linked to a real device and we're in the current scenario,
-  // offer to also remove it from the floor plan.
+  // Offer to remove from the floor plan only for the current state scenario.
   if (row.device_id && activeScenario === 'current') {
     const also = confirm(
       `Remove "${row.label || 'this device'}" from the floor plan map as well?\n\n` +
@@ -697,8 +740,10 @@ function updateEmptyState() {
   hint.classList.toggle('hidden', rows.length > 0);
   if (activeScenario === 'current') {
     text.innerHTML = 'Use <strong>Capture from Fleet</strong> to pull your client\'s devices,<br>or click <strong>+ Add Device</strong> to build the scenario manually.';
+  } else if (activeScenario.startsWith('floor_')) {
+    text.innerHTML = 'No devices found for this replacement scenario.<br>Go to the <strong>Planner</strong> and add devices to the replacement floor first.';
   } else {
-    text.innerHTML = 'Use <strong>Copy from Current State</strong> to start from the current fleet,<br>or click <strong>+ Add Device</strong> to build the scenario manually.';
+    text.innerHTML = 'No data for this scenario yet.';
   }
 }
 
@@ -719,24 +764,6 @@ async function captureFleet() {
     toast('Error: ' + err.message);
   } finally {
     btn.disabled = false; btn.textContent = '📥 Capture from Fleet';
-  }
-}
-
-async function copyFromCurrent() {
-  if (!currentClientId) { toast('Select a client first'); return; }
-  const btn = document.getElementById('copy-btn');
-  if (!btn) return;
-  btn.disabled = true; btn.textContent = 'Copying…';
-  try {
-    const data = await api('POST', `/clients/${currentClientId}/tco/future/copy-current`);
-    scenarios.future.rows   = (data || []).map(r => ({ ...r, id: nextId++ }));
-    scenarios.future.loaded = true;
-    renderRows();
-    toast('Future state copied from Current State — edit as needed');
-  } catch (err) {
-    toast('Error: ' + err.message);
-  } finally {
-    btn.disabled = false; btn.textContent = '📋 Copy from Current State';
   }
 }
 
@@ -903,8 +930,12 @@ Promise.all([loadClients(), loadCatalogue()]).then(async () => {
   if (urlClientId) {
     currentClientId = urlClientId;
     document.getElementById('client-sel').value = urlClientId;
-    setStatus('Loading current state…');
-    await loadScenario('current');
+    setNavLinks(urlClientId);
+    setStatus('Loading…');
+    await Promise.all([
+      loadScenario('current'),
+      loadReplacementFloors(urlClientId),
+    ]);
     setStatus('');
     renderRows();
   } else {

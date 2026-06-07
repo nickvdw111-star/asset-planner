@@ -172,6 +172,25 @@ def init_db():
             db.execute('ALTER TABLE floors ADD COLUMN source_floor_id INTEGER REFERENCES floors(id)')
         if 'scenario_name' not in flcols:
             db.execute("ALTER TABLE floors ADD COLUMN scenario_name TEXT")
+        db.execute('''
+            CREATE TABLE IF NOT EXISTS tco_floor_rows (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                floor_id    INTEGER NOT NULL REFERENCES floors(id) ON DELETE CASCADE,
+                sort_order  INTEGER NOT NULL DEFAULT 0,
+                device_id   TEXT,
+                label       TEXT NOT NULL DEFAULT '',
+                location    TEXT NOT NULL DEFAULT '',
+                brand       TEXT NOT NULL DEFAULT '',
+                model       TEXT NOT NULL DEFAULT '',
+                serial      TEXT NOT NULL DEFAULT '',
+                mono_vol    INTEGER NOT NULL DEFAULT 0,
+                colour_vol  INTEGER NOT NULL DEFAULT 0,
+                mono_rate   REAL,
+                colour_rate REAL,
+                rental      REAL,
+                period      TEXT
+            )
+        ''')
 
         # Add unique constraint on models(brand_id, name) if not already present
         # SQLite doesn't support ADD CONSTRAINT, so we check via index
@@ -1025,6 +1044,83 @@ def delete_floor(floor_id):
 
 
 # ── Floor scenarios (clone / list) ───────────────────────────────────────────
+
+@app.route('/api/floors/<int:floor_id>/rename', methods=['PATCH'])
+def rename_floor_scenario(floor_id):
+    data = request.json or {}
+    name = str(data.get('name', '')).strip()
+    if not name:
+        return jsonify({'error': 'Name required'}), 400
+    with get_db() as db:
+        db.execute('UPDATE floors SET scenario_name = ? WHERE id = ?', (name, floor_id))
+        row = db.execute('SELECT * FROM floors WHERE id = ?', (floor_id,)).fetchone()
+    return jsonify(dict(row))
+
+
+@app.route('/api/clients/<int:cid>/replacement-floors', methods=['GET'])
+def list_replacement_floors(cid):
+    with get_db() as db:
+        rows = db.execute('''
+            SELECT f.id, f.scenario_name, f.label, f.level,
+                   b.name AS building_name, ci.name AS city_name
+            FROM floors f
+            JOIN buildings b ON b.id = f.building_id
+            JOIN cities    ci ON ci.id = b.city_id
+            WHERE ci.client_id = ? AND f.source_floor_id IS NOT NULL
+            ORDER BY ci.name, b.name, f.id
+        ''', (cid,)).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route('/api/floors/<int:floor_id>/tco', methods=['GET'])
+def get_floor_tco(floor_id):
+    with get_db() as db:
+        saved = db.execute(
+            'SELECT * FROM tco_floor_rows WHERE floor_id = ? ORDER BY sort_order', (floor_id,)
+        ).fetchall()
+        if saved:
+            return jsonify([dict(r) for r in saved])
+        # Auto-generate from the replacement floor's devices
+        devs = db.execute('SELECT * FROM devices WHERE floor_id = ?', (floor_id,)).fetchall()
+        rows = []
+        for i, d in enumerate(devs):
+            rows.append({
+                'id': None, 'floor_id': floor_id, 'sort_order': i,
+                'device_id':   d['id'],
+                'label':       d['label']  or '',
+                'location':    '',
+                'brand':       d['brand']  or '',
+                'model':       d['model']  or '',
+                'serial':      d['serial'] or '',
+                'mono_vol':    d['avg_mono']   or 0,
+                'colour_vol':  d['avg_colour'] or 0,
+                'mono_rate':   d['mono_rate'],
+                'colour_rate': d['colour_rate'],
+                'rental':      d['rental_amount'],
+                'period':      d['rental_period'],
+            })
+    return jsonify(rows)
+
+
+@app.route('/api/floors/<int:floor_id>/tco', methods=['PUT'])
+def put_floor_tco(floor_id):
+    rows = request.json or []
+    with get_db() as db:
+        db.execute('DELETE FROM tco_floor_rows WHERE floor_id = ?', (floor_id,))
+        for i, r in enumerate(rows):
+            db.execute('''
+                INSERT INTO tco_floor_rows
+                  (floor_id, sort_order, device_id, label, location, brand, model, serial,
+                   mono_vol, colour_vol, mono_rate, colour_rate, rental, period)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ''', (floor_id, i,
+                  r.get('device_id'), r.get('label',''), r.get('location',''),
+                  r.get('brand',''), r.get('model',''), r.get('serial',''),
+                  r.get('mono_vol',0), r.get('colour_vol',0),
+                  r.get('mono_rate'), r.get('colour_rate'),
+                  r.get('rental'), r.get('period')))
+    return '', 204
+
 
 @app.route('/api/floors/<int:floor_id>/scenarios', methods=['GET'])
 def get_floor_scenarios(floor_id):

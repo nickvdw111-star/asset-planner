@@ -95,7 +95,7 @@
 
     /* ── Scenario bar ── */
     #scenario-bar {
-      display: none;
+      display: flex;
       align-items: center;
       gap: 6px;
       padding: 6px 16px;
@@ -104,7 +104,7 @@
       flex-shrink: 0;
       overflow-x: auto;
     }
-    #scenario-bar.visible { display: flex; }
+    #scenario-tabs { display: flex; align-items: center; gap: 6px; }
     .stab {
       display: flex; align-items: center; gap: 5px;
       padding: 4px 12px; border-radius: 6px; cursor: pointer;
@@ -1303,8 +1303,6 @@ function renderScenarioBar(data) {
   const reps = data.replacements;
   const cur  = data.current_id;
 
-  // Only show the bar if there are replacements (or we're viewing one)
-  if (!reps.length && cur == orig.id) { bar.classList.remove('visible'); return; }
   bar.classList.add('visible');
 
   // Original tab
@@ -1328,6 +1326,31 @@ function makeScenarioTab(flId, label, isActive, canDelete) {
 
   const nameEl = document.createElement('span');
   nameEl.textContent = label;
+  if (canDelete) {
+    nameEl.title = 'Double-click to rename';
+    nameEl.addEventListener('dblclick', e => {
+      e.stopPropagation();
+      const input = document.createElement('input');
+      input.value = nameEl.textContent;
+      input.style.cssText = 'width:120px; font-size:12px; padding:1px 5px; border:1px solid var(--accent-h); border-radius:4px; background:var(--surface2); color:var(--text); font-family:inherit;';
+      nameEl.replaceWith(input);
+      input.focus(); input.select();
+      async function commit() {
+        const val = input.value.trim();
+        if (val && val !== label) {
+          await fetch(`/api/floors/${flId}/rename`, {
+            method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: val})
+          });
+        }
+        loadScenarios();
+      }
+      input.addEventListener('blur', commit);
+      input.addEventListener('keydown', e2 => {
+        if (e2.key === 'Enter') { e2.preventDefault(); input.blur(); }
+        if (e2.key === 'Escape') { input.removeEventListener('blur', commit); loadScenarios(); }
+      });
+    });
+  }
   tab.appendChild(nameEl);
 
   if (canDelete) {
